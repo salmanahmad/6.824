@@ -14,6 +14,7 @@ type LockArgs struct {
   // Go's net/rpc requires that these field
   // names start with upper case letters!
   Lockname string  // lock name
+  RequestId string  // the client uuid
 }
 
 type LockReply struct {
@@ -26,6 +27,7 @@ type LockReply struct {
 //
 type UnlockArgs struct {
   Lockname string
+  RequestId string
 }
 
 type UnlockReply struct {

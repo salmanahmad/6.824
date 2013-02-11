@@ -2,20 +2,47 @@ package lockservice
 
 import "net/rpc"
 
+
+// START NOT MY CODE
+// Taken from: http://www.ashishbanerjee.com/home/go/go-generate-uuid
+import "encoding/hex"
+import "crypto/rand"
+
+func GenUUID() (string, error) {
+  uuid := make([]byte, 16)
+  n, err := rand.Read(uuid)
+  if n != len(uuid) || err != nil {
+    return "", err
+  }
+  
+  // TODO: verify the two lines implement RFC 4122 correctly
+  uuid[8] = 0x80 // variant bits see page 5
+  uuid[4] = 0x40 // version 4 Pseudo Random, see page 7
+
+  return hex.EncodeToString(uuid), nil
+}
+// END NOT MY CODE
+
+
+
+
+
+
 //
 // the lockservice Clerk lives in the client
 // and maintains a little state.
 //
 type Clerk struct {
   servers [2]string // primary port, backup port
-  // Your definitions here.
+  uuid string
 }
 
 func MakeClerk(primary string, backup string) *Clerk {
   ck := new(Clerk)
   ck.servers[0] = primary
   ck.servers[1] = backup
-  // Your initialization code here.
+  ck.uuid, _ = GenUUID();
+
   return ck
 }
 
@@ -55,12 +82,11 @@ func call(srv string, rpcname string,
 // returns true if the lock service
 // granted the lock, false otherwise.
 //
-// you will have to modify this function.
-//
-func (ck *Clerk) Lock(lockname string) bool {
+func (ck *Clerk) LockUsingRequest(lockname string, requestId string) bool {
   // prepare the arguments.
   args := &LockArgs{}
   args.Lockname = lockname
+  args.RequestId = requestId
   var reply LockReply
   
   // send an RPC request, wait for the reply.
@@ -76,16 +102,23 @@ func (ck *Clerk) Lock(lockname string) bool {
 }
 
 
+func (ck *Clerk) Lock(lockname string) bool {
+  var id string = ""
+  id, _ = GenUUID()
+  return ck.LockUsingRequest(lockname, id)
+}
+
+
 //
 // ask the lock service to unlock a lock.
 // returns true if the lock was previously held,
 // false otherwise.
 //
-
-func (ck *Clerk) Unlock(lockname string) bool {
+func (ck *Clerk) UnlockUsingRequest(lockname string, requestId string) bool {
   // prepare the arguments.
   args := &UnlockArgs{}
   args.Lockname = lockname
+  args.RequestId = requestId
   var reply UnlockReply
   
   // send an RPC request, wait for the reply.
@@ -99,3 +132,12 @@ func (ck *Clerk) Unlock(lockname string) bool {
   
   return reply.OK
 }
+
+func (ck *Clerk) Unlock(lockname string) bool {
+  var id string = ""
+  id, _ = GenUUID()
+  return ck.UnlockUsingRequest(lockname, id)
+}
+
+
+

@@ -73,11 +73,11 @@ func (ls *LockServer) Lock(args *LockArgs, reply *LockReply) error {
 
     reply.OK = true
     ls.locks[args.Lockname] = LockEntry{true, args.RequestId}
+  }
 
-    if ls.am_primary {
-      ck := MakeClerk(ls.backup, ls.backup)
-      ck.LockUsingRequest(args.Lockname, args.RequestId);
-    }
+  if ls.am_primary {
+    ck := MakeClerk(ls.backup, ls.backup)
+    ck.LockUsingRequest(args.Lockname, args.RequestId);
   }
 
   ls.requests[args.RequestId] = reply.OK
@@ -119,13 +119,13 @@ func (ls *LockServer) Unlock(args *UnlockArgs, reply *UnlockReply) error {
     reply.OK = true
     ls.locks[args.Lockname] = LockEntry{false, args.RequestId}
 
-    if ls.am_primary {
-      ck := MakeClerk(ls.backup, ls.backup)
-      ck.UnlockUsingRequest(args.Lockname, args.RequestId);
-    }
-
   } else {
     reply.OK = false
+  }
+
+  if ls.am_primary {
+    ck := MakeClerk(ls.backup, ls.backup)
+    ck.UnlockUsingRequest(args.Lockname, args.RequestId);
   }
 
   ls.requests[args.RequestId] = reply.OK

@@ -11,6 +11,7 @@ type Clerk struct {
   // Your definitions here.
 }
 
+
 func MakeClerk(primary string, backup string) *Clerk {
   ck := new(Clerk)
   ck.servers[0] = primary

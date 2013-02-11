@@ -191,8 +191,8 @@ func Test1(t *testing.T) {
     }
     check(t, ck1, ck3.me, ck1.me, vx.Viewnum+1)
     vy, _ := ck1.Get()
-    // let ck3 die without acking; since primary
-    // never acked, viewserver should not proceed.
+    // ck3 is the primary, but it never acked.
+    // let ck3 die. check that ck1 is not promoted.
     for i := 0; i < DeadPings * 3; i++ {
       v, _ := ck1.Ping(vy.Viewnum)
       if v.Viewnum > vy.Viewnum {

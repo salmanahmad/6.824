@@ -14,16 +14,53 @@ type ViewServer struct {
   dead bool
   me string
 
-
   // Your declarations here.
+  startUp bool
+  timeKeeper map[string]time.Time
+  currentView View
+  primaryView View
 }
 
 //
 // server Ping RPC handler.
 //
 func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
+  vs.mu.Lock()
+  defer vs.mu.Unlock()
+  
+  if vs.startUp {
+    // The first request is special. Any server can be primary
+    vs.startUp = false
 
-  // Your code here.
+    // Note: The primary view has not changed yet because it has not acked
+    vs.currentView.Viewnum++
+    vs.currentView.Primary = args.Me
+  }
+
+  if args.Me == vs.currentView.Primary {
+    // Send the primary the pending view and wait for it to ack it
+    if args.Viewnum == vs.primaryView.Viewnum {
+      vs.timeKeeper[args.Me] = time.Now()
+    }
+
+    if args.Viewnum == vs.currentView.Viewnum {
+      vs.primaryView = vs.currentView
+    }
+
+    reply.View = vs.currentView
+  } else {
+    // For everyone else respond with the current view
+    vs.timeKeeper[args.Me] = time.Now()
+
+    if vs.currentView.Viewnum == vs.primaryView.Viewnum {
+      if vs.currentView.Backup == "" {
+        vs.currentView.Viewnum++
+        vs.currentView.Backup = args.Me
+      }
+    }
+
+    reply.View = vs.currentView
+  }
 
   return nil
 }
@@ -32,8 +69,11 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 // server Get() RPC handler.
 //
 func (vs *ViewServer) Get(args *GetArgs, reply *GetReply) error {
+  vs.mu.Lock()
+  defer vs.mu.Unlock()
 
-  // Your code here.
+  reply.View = vs.currentView
+
 
   return nil
 }
@@ -45,8 +85,28 @@ func (vs *ViewServer) Get(args *GetArgs, reply *GetReply) error {
 // accordingly.
 //
 func (vs *ViewServer) tick() {
+  vs.mu.Lock()
+  defer vs.mu.Unlock()
 
-  // Your code here.
+  for server, _ := range vs.timeKeeper {
+    var lastPingTime = vs.timeKeeper[server]
+    var duration = time.Now().Sub(lastPingTime)
+    if duration > (PingInterval * DeadPings) {
+      // The server is considered dead...
+      delete(vs.timeKeeper, server)
+      if(server == vs.currentView.Primary) {
+        if vs.currentView.Viewnum == vs.primaryView.Viewnum {
+          vs.currentView.Viewnum++
+          vs.currentView.Primary = vs.currentView.Backup
+          vs.currentView.Backup = ""
+
+          vs.primaryView.Viewnum = 0
+          vs.primaryView.Primary = ""
+          vs.primaryView.Backup = ""
+        }
+      }
+    }
+  }
 }
 
 //
@@ -62,7 +122,11 @@ func (vs *ViewServer) Kill() {
 func StartServer(me string) *ViewServer {
   vs := new(ViewServer)
   vs.me = me
-  // Your vs.* initializations here.
+  
+  // START Your vs.* initializations here.
+  vs.startUp = true
+  vs.timeKeeper = make(map[string]time.Time)
+  // END Your vs.* initializations here.
 
   // tell net/rpc about our RPC server and handlers.
   rpcs := rpc.NewServer()

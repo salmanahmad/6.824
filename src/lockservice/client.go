@@ -37,6 +37,7 @@ type Clerk struct {
   uuid string
 }
 
+
 func MakeClerk(primary string, backup string) *Clerk {
   ck := new(Clerk)
   ck.servers[0] = primary

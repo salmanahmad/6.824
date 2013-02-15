@@ -40,7 +40,7 @@ func ndecided(t *testing.T, pxa []*Paxos, seq int) int {
 
 func waitn(t *testing.T, pxa[]*Paxos, seq int, wanted int) {
   to := 10 * time.Millisecond
-  for iters := 0; iters < 10; iters++ {
+  for iters := 0; iters < 30; iters++ {
     if ndecided(t, pxa, seq) >= wanted {
       break
     }
@@ -658,24 +658,30 @@ func TestPartition(t *testing.T) {
 
   fmt.Printf("Test: One peer switches partitions, unreliable ...\n")
 
-  for i := 0; i < npaxos; i++ {
-    pxa[i].unreliable = true
-  }
 
   for iters := 0; iters < 20; iters++ {
     seq++
+
+    for i := 0; i < npaxos; i++ {
+      pxa[i].unreliable = true
+    }
 
     part(t, tag, npaxos, []int{0,1,2}, []int{3,4}, []int{})
     for i := 0; i < npaxos; i++ {
       pxa[i].Start(seq, (seq * 10) + i)
     }
-    waitmajority(t, pxa, seq)
+    waitn(t, pxa, seq, 3)
     if ndecided(t, pxa, seq) > 3 {
       t.Fatalf("too many decided")
     }
     
     part(t, tag, npaxos, []int{0,1}, []int{2,3,4}, []int{})
-    waitn(t, pxa, seq, 4)
+
+    for i := 0; i < npaxos; i++ {
+      pxa[i].unreliable = false
+    }
+
+    waitn(t, pxa, seq, 5)
   }
 
   fmt.Printf("  ... Passed\n")

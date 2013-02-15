@@ -30,6 +30,44 @@ type KVPaxos struct {
 }
 
 
+// catch up -- execute operations we have not seen yet,
+// up to and including seq.
+// caller must hold the mutex, at least to avoid
+// concurrent calls.
+// maybe a separate thread should be doing this.
+func (kv *KVPaxos) catchUp(seq int) {
+  for kv.seq <= seq {
+    to := 10 * time.Millisecond
+    for {
+      if kv.seq < kv.px.Min() {
+        log.Fatalf("%v: catchUp(%v) replay wait for kv.seq=%v Min()=%v\n",
+          kv.me, seq, kv.seq, kv.px.Min())
+      }
+      decided, xop := kv.px.Status(kv.seq)
+      if decided {
+        yop := xop.(Op)
+        want, _ := kv.cseqs[yop.CID]
+        if want == yop.Cseq {
+          kv.cseqs[yop.CID] = want + 1
+          if yop.Op == opPut {
+            kv.data[yop.Key] = yop.Value
+          }
+        } else if yop.Op != opNop {
+          fmt.Printf("me=%v wrong cseq; seq=%v op %v key=%v value=%v cid %v expecting %v got %v\n",
+            kv.me, kv.seq, yop.Op, yop.Key, yop.Value, yop.CID, want, yop.Cseq)
+        }
+        break
+      }
+      time.Sleep(to) // XXX too long?
+      to *= 2
+      if to > 100 * time.Millisecond {
+        kv.startNop(kv.seq)
+      }
+    }
+    kv.seq += 1
+  }
+}
+
 func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
   // Your code here.
 

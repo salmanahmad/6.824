@@ -480,7 +480,9 @@ func TestManyPartition(t *testing.T) {
   done := false
 
   // re-partition periodically
+  ch1 := make(chan bool)
   go func() {
+    defer func() { ch1 <- true } ()
     for done == false {
       var a [nservers]int
       for i := 0; i < nservers; i++ {
@@ -536,8 +538,9 @@ func TestManyPartition(t *testing.T) {
     } (xcli)
   }
 
-  time.Sleep(10 * time.Second)
+  time.Sleep(20 * time.Second)
   done = true
+  <- ch1
   part(t, tag, nservers, []int{0,1,2,3,4}, []int{}, []int{})
 
   ok := true

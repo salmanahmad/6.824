@@ -299,6 +299,7 @@ func TestManyForget(t *testing.T) {
   }
   for i := 0; i < npaxos; i++ {
     pxa[i] = Make(pxh, i, nil)
+    pxa[i].unreliable = true
   }
 
   fmt.Printf("Test: Lots of forgetting ...\n")
@@ -307,11 +308,12 @@ func TestManyForget(t *testing.T) {
   done := false
 
   go func() {
-    for done == false {
-      seq := (rand.Int() % maxseq)
-      i := (rand.Int() % npaxos)
+    na := rand.Perm(maxseq)
+    for i := 0; i < len(na); i++ {
+      seq := na[i]
+      j := (rand.Int() % npaxos)
       v := rand.Int() 
-      pxa[i].Start(seq, v)
+      pxa[j].Start(seq, v)
       runtime.Gosched()
     }
   }()
@@ -332,7 +334,10 @@ func TestManyForget(t *testing.T) {
 
   time.Sleep(5 * time.Second)
   done = true
-  time.Sleep(1 * time.Second)
+  for i := 0; i < npaxos; i++ {
+    pxa[i].unreliable = false
+  }
+  time.Sleep(2 * time.Second)
 
   for seq := 0; seq < maxseq; seq++ {
     for i := 0; i < npaxos; i++ {

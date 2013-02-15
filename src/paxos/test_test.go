@@ -303,7 +303,7 @@ func TestManyForget(t *testing.T) {
 
   fmt.Printf("Test: Lots of forgetting ...\n")
 
-  const maxseq = 30
+  const maxseq = 20
   done := false
 
   go func() {
@@ -667,6 +667,7 @@ func TestPartition(t *testing.T) {
 
     part(t, tag, npaxos, []int{0,1,2}, []int{3,4}, []int{})
     pxa[0].Start(seq, seq * 10)
+    pxa[2].Start(seq, (seq * 10) + 2) // force him to decide before switching
     pxa[3].Start(seq, (seq * 10) + 1)
     waitmajority(t, pxa, seq)
     if ndecided(t, pxa, seq) > 3 {
@@ -741,15 +742,8 @@ func TestLots(t *testing.T) {
         }
       }
       if seq - nd < 20 {
-        n := 0
         for i := 0; i < npaxos; i++ {
-          if (rand.Int() % 100) < 30 {
-            n++
-            pxa[i].Start(seq, rand.Int() % 10)
-          }
-        }
-        if n == 0 {
-          pxa[0].Start(seq, rand.Int() % 10)
+          pxa[i].Start(seq, rand.Int() % 10)
         }
         seq++
       }

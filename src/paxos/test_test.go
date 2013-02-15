@@ -666,9 +666,9 @@ func TestPartition(t *testing.T) {
     seq++
 
     part(t, tag, npaxos, []int{0,1,2}, []int{3,4}, []int{})
-    pxa[0].Start(seq, seq * 10)
-    pxa[2].Start(seq, (seq * 10) + 2) // force him to decide before switching
-    pxa[3].Start(seq, (seq * 10) + 1)
+    for i := 0; i < npaxos; i++ {
+      pxa[i].Start(seq, (seq * 10) + i)
+    }
     waitmajority(t, pxa, seq)
     if ndecided(t, pxa, seq) > 3 {
       t.Fatalf("too many decided")

@@ -59,13 +59,17 @@ type Paxos struct {
 // please don't change this function.
 //
 func call(srv string, name string, args interface{}, reply interface{}) bool {
-  c, errx := rpc.Dial("unix", srv)
-  if errx != nil {
+  c, err := rpc.Dial("unix", srv)
+  if err != nil {
+    err1 := err.(*net.OpError)
+    if err1.Err != syscall.ENOENT && err1.Err != syscall.ECONNREFUSED {
+      fmt.Printf("paxos Dial() failed: %v\n", err1)
+    }
     return false
   }
   defer c.Close()
     
-  err := c.Call(name, args, reply)
+  err = c.Call(name, args, reply)
   if err == nil {
     return true
   }
@@ -222,7 +226,6 @@ func Make(peers []string, me int, rpcs *rpc.Server) *Paxos {
         }
         if err != nil && px.dead == false {
           fmt.Printf("Paxos(%v) accept: %v\n", me, err.Error())
-          px.Kill()
         }
       }
     }()

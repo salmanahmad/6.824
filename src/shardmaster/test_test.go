@@ -286,7 +286,10 @@ func TestUnreliable(t *testing.T) {
   }
   for i := 0; i < nservers; i++ {
     sma[i] = StartServer(kvh, i)
-    sma[i].unreliable = true
+    // don't turn on unreliable because the assignment
+    // doesn't require the shardmaster to detect duplicate
+    // client requests.
+    // sma[i].unreliable = true
   }
 
   ck := MakeClerk(kvh)
@@ -295,7 +298,7 @@ func TestUnreliable(t *testing.T) {
     cka[i] = MakeClerk([]string{kvh[i]})
   }
 
-  fmt.Printf("Test: Concurrent leave/join, unreliable, failure ...\n")
+  fmt.Printf("Test: Concurrent leave/join, failure ...\n")
 
   const npara = 20
   gids := make([]int64, npara)

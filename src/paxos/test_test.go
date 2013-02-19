@@ -84,7 +84,7 @@ func noTestSpeed(t *testing.T) {
   defer cleanup(pxa)
 
   for i := 0; i < npaxos; i++ {
-    pxh[i] = port("basic", i)
+    pxh[i] = port("time", i)
   }
   for i := 0; i < npaxos; i++ {
     pxa[i] = Make(pxh, i, nil)
@@ -412,6 +412,74 @@ func TestForgetMem(t *testing.T) {
 
   if m2.Alloc > (m1.Alloc / 2) {
     t.Fatalf("memory use did not shrink enough")
+  }
+
+  fmt.Printf("  ... Passed\n")
+}
+
+func TestRPCCount(t *testing.T) {
+  runtime.GOMAXPROCS(4)
+
+  fmt.Printf("Test: RPC counts aren't too high ...\n")
+
+  const npaxos = 3
+  var pxa []*Paxos = make([]*Paxos, npaxos)
+  var pxh []string = make([]string, npaxos)
+  defer cleanup(pxa)
+
+  for i := 0; i < npaxos; i++ {
+    pxh[i] = port("count", i)
+  }
+  for i := 0; i < npaxos; i++ {
+    pxa[i] = Make(pxh, i, nil)
+  }
+
+  ninst1 := 5
+  seq := 0
+  for i := 0; i < ninst1; i++ {
+    pxa[0].Start(seq, "x")
+    waitn(t, pxa, seq, npaxos)
+    seq++
+  }
+
+  time.Sleep(2 * time.Second)
+
+  total1 := 0
+  for j := 0; j < npaxos; j++ {
+    total1 += pxa[j].rpcCount
+  }
+
+  // per agreement:
+  // 3 prepares
+  // 3 accepts
+  // 3 decides
+  if total1 > ninst1 * npaxos * 3 {
+    t.Fatalf("too many RPCs for serial Start()s")
+  }
+
+  ninst2 := 5
+  for i := 0; i < ninst2; i++ {
+    for j := 0; j < npaxos; j++ {
+      pxa[j].Start(seq, j + (i * 10))
+    }
+    waitn(t, pxa, seq, npaxos)
+    seq++
+  }
+
+  time.Sleep(2 * time.Second)
+
+  total2 := 0
+  for j := 0; j < npaxos; j++ {
+    total2 += pxa[j].rpcCount
+  }
+  total2 -= total1
+
+  // per agreement:
+  // 9 prepares
+  // 9 accepts
+  // 3 decides
+  if total2 > ninst2 * (3 + (npaxos * (3 + 3))) {
+    t.Fatalf("too many RPCs for concurrent Start()s")
   }
 
   fmt.Printf("  ... Passed\n")

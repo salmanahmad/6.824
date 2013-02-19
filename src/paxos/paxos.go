@@ -35,6 +35,7 @@ type Paxos struct {
   l net.Listener
   dead bool
   unreliable bool
+  rpcCount int
   peers []string
   me int // index into peers[]
 
@@ -217,8 +218,10 @@ func Make(peers []string, me int, rpcs *rpc.Server) *Paxos {
             if err != nil {
               fmt.Printf("shutdown: %v\n", err)
             }
+            px.rpcCount++
             go rpcs.ServeConn(conn)
           } else {
+            px.rpcCount++
             go rpcs.ServeConn(conn)
           }
         } else if err == nil {

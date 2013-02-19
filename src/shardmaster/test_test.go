@@ -174,10 +174,23 @@ func TestBasic(t *testing.T) {
     var gid4 int64 = 504
     ck.Join(gid4, []string{"4a", "4b", "4c"})
     for i := 0; i < NShards; i++ {
+      cf := ck.Query(-1)
       if i < NShards / 2 {
         ck.Move(i, gid3)
+        if cf.Shards[i] != gid3 {
+          cf1 := ck.Query(-1)
+          if cf1.Num <= cf.Num {
+            t.Fatalf("Move should increase Config.Num")
+          }
+        }
       } else {
         ck.Move(i, gid4)
+        if cf.Shards[i] != gid4 {
+          cf1 := ck.Query(-1)
+          if cf1.Num <= cf.Num {
+            t.Fatalf("Move should increase Config.Num")
+          }
+        }
       }
     }
     cf2 := ck.Query(-1)

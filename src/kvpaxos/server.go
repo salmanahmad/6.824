@@ -61,6 +61,9 @@ func (kv *KVPaxos) kill() {
 // me is the index of the current server in servers[].
 // 
 func StartServer(servers []string, me int) *KVPaxos {
+  // this call is all that's needed to persuade
+  // Go's RPC library to marshall/unmarshall
+  // struct Op.
   gob.Register(Op{})
 
   kv := new(KVPaxos)

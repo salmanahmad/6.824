@@ -460,7 +460,7 @@ func TestRPCCount(t *testing.T) {
   ninst2 := 5
   for i := 0; i < ninst2; i++ {
     for j := 0; j < npaxos; j++ {
-      pxa[j].Start(seq, j + (i * 10))
+      go pxa[j].Start(seq, j + (i * 10))
     }
     waitn(t, pxa, seq, npaxos)
     seq++

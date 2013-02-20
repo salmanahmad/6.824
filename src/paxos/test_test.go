@@ -453,8 +453,10 @@ func TestRPCCount(t *testing.T) {
   // 3 prepares
   // 3 accepts
   // 3 decides
-  if total1 > ninst1 * npaxos * 3 {
-    t.Fatalf("too many RPCs for serial Start()s")
+  expected1 := ninst1 * npaxos * 3
+  if total1 > expected1 {
+    t.Fatalf("too many RPCs for serial Start()s; %v instances, got %v, expected %v",
+      ninst1, total1, expected1)
   }
 
   ninst2 := 5
@@ -478,8 +480,10 @@ func TestRPCCount(t *testing.T) {
   // 9 prepares
   // 9 accepts
   // 3 decides
-  if total2 > ninst2 * (3 + (npaxos * (3 + 3))) {
-    t.Fatalf("too many RPCs for concurrent Start()s")
+  expected2 := ninst2 * (3 + (npaxos * (3 + 3)))
+  if total2 > expected2 {
+    t.Fatalf("too many RPCs for concurrent Start()s; %v instances, got %v, expected %v",
+      ninst2, total2, expected2)
   }
 
   fmt.Printf("  ... Passed\n")

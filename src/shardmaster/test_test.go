@@ -323,3 +323,39 @@ func TestUnreliable(t *testing.T) {
 
   fmt.Printf("  ... Passed\n")
 }
+
+func TestFreshQuery(t *testing.T) {
+  runtime.GOMAXPROCS(4)
+
+  const nservers = 3
+  var sma []*ShardMaster = make([]*ShardMaster, nservers)
+  var kvh []string = make([]string, nservers)
+  defer cleanup(sma)
+
+  for i := 0; i < nservers; i++ {
+    kvh[i] = port("fresh", i)
+  }
+  for i := 0; i < nservers; i++ {
+    sma[i] = StartServer(kvh, i)
+  }
+
+  ck1 := MakeClerk([]string{kvh[1]})
+
+  fmt.Printf("Test: Query() returns latest configuration ...\n")
+
+  portx := kvh[0] + strconv.Itoa(rand.Int())
+  if os.Rename(kvh[0], portx) != nil {
+    t.Fatalf("os.Rename() failed")
+  }
+  ck0 := MakeClerk([]string{portx})
+
+  ck1.Join(1001, []string{"a", "b", "c"})
+  c := ck0.Query(-1)
+  _, ok := c.Groups[1001]
+  if ok == false {
+    t.Fatalf("Query(-1) produced a stale configuration")
+  }
+
+  fmt.Printf("  ... Passed\n")
+  os.Remove(portx)
+}

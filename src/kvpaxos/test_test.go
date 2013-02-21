@@ -71,7 +71,7 @@ func TestBasic(t *testing.T) {
   fmt.Printf("Test: Concurrent clients ...\n")
 
   for iters := 0; iters < 20; iters++ {
-    const npara = 30
+    const npara = 15
     var ca [npara]chan bool
     for nth := 0; nth < npara; nth++ {
       ca[nth] = make(chan bool)
@@ -280,38 +280,40 @@ func TestUnreliable(t *testing.T) {
 
   fmt.Printf("Test: Sequence of puts, unreliable ...\n")
 
-  const ncli = 30
-  var ca [ncli]chan bool
-  for cli := 0; cli < ncli; cli++ {
-    ca[cli] = make(chan bool)
-    go func(me int) {
-      ok := false
-      defer func() { ca[me] <- ok }()
-      sa := make([]string, len(kvh))
-      copy(sa, kvh)
-      for i := range sa {
-        j := rand.Intn(i+1)
-        sa[i], sa[j] = sa[j], sa[i]
+  for iters := 0; iters < 6; iters++ {
+  const ncli = 5
+    var ca [ncli]chan bool
+    for cli := 0; cli < ncli; cli++ {
+      ca[cli] = make(chan bool)
+      go func(me int) {
+        ok := false
+        defer func() { ca[me] <- ok }()
+        sa := make([]string, len(kvh))
+        copy(sa, kvh)
+        for i := range sa {
+          j := rand.Intn(i+1)
+          sa[i], sa[j] = sa[j], sa[i]
+        }
+        myck := MakeClerk(sa)
+        key := strconv.Itoa(me)
+        myck.Put(key, "0")
+        myck.Put(key, "1")
+        myck.Put(key, "2")
+        time.Sleep(100 * time.Millisecond)
+        if myck.Get(key) != "2" {
+          t.Fatalf("wrong value")
+        }
+        if myck.Get(key) != "2" {
+          t.Fatalf("wrong value")
+        }
+        ok = true
+      }(cli)
+    }
+    for cli := 0; cli < ncli; cli++ {
+      x := <- ca[cli]
+      if x == false {
+        t.Fatalf("failure")
       }
-      myck := MakeClerk(sa)
-      key := strconv.Itoa(me)
-      myck.Put(key, "0")
-      myck.Put(key, "1")
-      myck.Put(key, "2")
-      time.Sleep(100 * time.Millisecond)
-      if myck.Get(key) != "2" {
-        t.Fatalf("wrong value")
-      }
-      if myck.Get(key) != "2" {
-        t.Fatalf("wrong value")
-      }
-      ok = true
-    }(cli)
-  }
-  for cli := 0; cli < ncli; cli++ {
-    x := <- ca[cli]
-    if x == false {
-      t.Fatalf("failure")
     }
   }
 
@@ -320,7 +322,7 @@ func TestUnreliable(t *testing.T) {
   fmt.Printf("Test: Concurrent clients, unreliable ...\n")
 
   for iters := 0; iters < 20; iters++ {
-    const ncli = 30
+    const ncli = 15
     var ca [ncli]chan bool
     for cli := 0; cli < ncli; cli++ {
       ca[cli] = make(chan bool)
@@ -478,7 +480,9 @@ func TestManyPartition(t *testing.T) {
   done := false
 
   // re-partition periodically
+  ch1 := make(chan bool)
   go func() {
+    defer func() { ch1 <- true } ()
     for done == false {
       var a [nservers]int
       for i := 0; i < nservers; i++ {
@@ -534,8 +538,9 @@ func TestManyPartition(t *testing.T) {
     } (xcli)
   }
 
-  time.Sleep(10 * time.Second)
+  time.Sleep(20 * time.Second)
   done = true
+  <- ch1
   part(t, tag, nservers, []int{0,1,2,3,4}, []int{}, []int{})
 
   ok := true

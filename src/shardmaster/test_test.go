@@ -174,10 +174,23 @@ func TestBasic(t *testing.T) {
     var gid4 int64 = 504
     ck.Join(gid4, []string{"4a", "4b", "4c"})
     for i := 0; i < NShards; i++ {
+      cf := ck.Query(-1)
       if i < NShards / 2 {
         ck.Move(i, gid3)
+        if cf.Shards[i] != gid3 {
+          cf1 := ck.Query(-1)
+          if cf1.Num <= cf.Num {
+            t.Fatalf("Move should increase Config.Num")
+          }
+        }
       } else {
         ck.Move(i, gid4)
+        if cf.Shards[i] != gid4 {
+          cf1 := ck.Query(-1)
+          if cf1.Num <= cf.Num {
+            t.Fatalf("Move should increase Config.Num")
+          }
+        }
       }
     }
     cf2 := ck.Query(-1)
@@ -273,7 +286,10 @@ func TestUnreliable(t *testing.T) {
   }
   for i := 0; i < nservers; i++ {
     sma[i] = StartServer(kvh, i)
-    sma[i].unreliable = true
+    // don't turn on unreliable because the assignment
+    // doesn't require the shardmaster to detect duplicate
+    // client requests.
+    // sma[i].unreliable = true
   }
 
   ck := MakeClerk(kvh)
@@ -282,7 +298,7 @@ func TestUnreliable(t *testing.T) {
     cka[i] = MakeClerk([]string{kvh[i]})
   }
 
-  fmt.Printf("Test: Concurrent leave/join, unreliable, failure ...\n")
+  fmt.Printf("Test: Concurrent leave/join, failure ...\n")
 
   const npara = 20
   gids := make([]int64, npara)
@@ -306,4 +322,40 @@ func TestUnreliable(t *testing.T) {
   check(t, gids, ck)
 
   fmt.Printf("  ... Passed\n")
+}
+
+func TestFreshQuery(t *testing.T) {
+  runtime.GOMAXPROCS(4)
+
+  const nservers = 3
+  var sma []*ShardMaster = make([]*ShardMaster, nservers)
+  var kvh []string = make([]string, nservers)
+  defer cleanup(sma)
+
+  for i := 0; i < nservers; i++ {
+    kvh[i] = port("fresh", i)
+  }
+  for i := 0; i < nservers; i++ {
+    sma[i] = StartServer(kvh, i)
+  }
+
+  ck1 := MakeClerk([]string{kvh[1]})
+
+  fmt.Printf("Test: Query() returns latest configuration ...\n")
+
+  portx := kvh[0] + strconv.Itoa(rand.Int())
+  if os.Rename(kvh[0], portx) != nil {
+    t.Fatalf("os.Rename() failed")
+  }
+  ck0 := MakeClerk([]string{portx})
+
+  ck1.Join(1001, []string{"a", "b", "c"})
+  c := ck0.Query(-1)
+  _, ok := c.Groups[1001]
+  if ok == false {
+    t.Fatalf("Query(-1) produced a stale configuration")
+  }
+
+  fmt.Printf("  ... Passed\n")
+  os.Remove(portx)
 }

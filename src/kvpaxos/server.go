@@ -14,6 +14,8 @@ import "math/rand"
 
 type Op struct {
   // Your definitions here.
+  // Field names must start with capital letters,
+  // otherwise RPC will break.
 }
 
 type KVPaxos struct {
@@ -26,6 +28,7 @@ type KVPaxos struct {
 
   // Your definitions here.
 }
+
 
 
 func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
@@ -58,6 +61,9 @@ func (kv *KVPaxos) kill() {
 // me is the index of the current server in servers[].
 // 
 func StartServer(servers []string, me int) *KVPaxos {
+  // this call is all that's needed to persuade
+  // Go's RPC library to marshall/unmarshall
+  // struct Op.
   gob.Register(Op{})
 
   kv := new(KVPaxos)

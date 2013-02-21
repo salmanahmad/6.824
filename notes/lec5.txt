@@ -1,0 +1,12 @@
+
+The value that is ultimately chosen is "foo". The reason why this sequence will never happen has to do with Step 3. 
+
+Step 3 says that B gets a response for the "prepare" message from both B and C. That would never happen. B may send a response back, but C will not. The reason for this is because C has already accepted (1, "foo") previously in Step 2. 
+
+The Paxos algorithm says (in P2a) that:
+
+"If a proposal with value v is chosen, then every higher-numbered proposal accepted by any acceptor has value v."
+
+Since C has already accepted "foo" it will not accept "bar" since "foo" != "bar". 
+
+Thus, B will never get a response back from C for the prepare and thus will never assume that "bar" has been chosen because a majority has not agreed on the value. Eventually the listener on B will get notified that the majority has already picked "foo" and will stop trying to send "bar" and accept that the ultimate value is "foo".

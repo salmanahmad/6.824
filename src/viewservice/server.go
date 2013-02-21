@@ -56,6 +56,8 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
       if vs.currentView.Backup == "" {
         vs.currentView.Viewnum++
         vs.currentView.Backup = args.Me
+
+        //fmt.Printf("View Service: Setting the backup server to: %s\n", args.Me)
       }
     }
 
@@ -110,12 +112,10 @@ func (vs *ViewServer) tick() {
         vs.currentView.Viewnum++
         vs.currentView.Backup = ""
       }
-  
-      //fmt.Printf("View Service: Current View: (%s, %s)\n", vs.currentView.Primary, vs.currentView.Backup)    
-      
     }
   }
   
+  //fmt.Printf("View Service: Current View: (%s, %s)\n", vs.currentView.Primary, vs.currentView.Backup)    
   
 }
 

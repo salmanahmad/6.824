@@ -118,12 +118,12 @@ func (pb *PBServer) DoPut(key string, value string) {
 //   manage transfer of state from primary to new backup.
 //
 func (pb *PBServer) tick() {
-  pb.mu.Lock()
-  defer pb.mu.Unlock()
-  
   view, _ := pb.vs.Ping(pb.view.Viewnum)
 
   if(view != pb.view) {
+    pb.mu.Lock()
+    defer pb.mu.Unlock()
+
     pb.view = view
     
     if(pb.IsPrimary() && pb.HasBackup()) {

@@ -72,11 +72,13 @@ func (ck *Clerk) Get(key string) string {
     ok := call(ck.view.Primary, "PBServer.Get", args, &reply)
     if !ok || reply.Err != OK {
       ck.view, _ = ck.vs.Get()
-      time.Sleep(viewservice.PingInterval)
+      
       
       if DEBUG {
         fmt.Printf("Reply: %s\n", reply.Err)
       }
+      
+      time.Sleep(viewservice.PingInterval)
       
     } else {
       break

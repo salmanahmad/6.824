@@ -1,0 +1,16 @@
+I actually believe that this is possible. Here is the sequence of operations that I think would lead to this case:
+
+1) T1's network cable falls out and does send its heartbeat to the metadata server. The current TLT version number is "X"
+
+2) The metadata server updates the TLT and notifies all other tract servers except for T1 (obviously, since it is down). 
+
+3) All other trace server now have the TLT with the correct up-to-date version number ("X" + 1). Any client request made using the old TLT will be rejected and clients will download the new version from the metadata server.
+
+4) Client C1 has a cached version of the TLT with version number "X". C1 is about to look up its TLT but doesn't do so yet…
+
+5) T1 comes back online. Since is not aware that its network status changed and still have TLT with version "X". 
+
+6) C1 looks up its cached TLT and notices that it should send a request to T1 and does so.
+
+7) ERROR: T1 now processed a request from C1 even though at this time T1 was NOT in the TLT. The ultimate problem here, I believe, stems from the fact that the TLT is cached by both client and server. My understanding of the paper is that there is not a feature that accounts for this case.
+

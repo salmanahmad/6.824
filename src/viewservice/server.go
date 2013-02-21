@@ -73,8 +73,7 @@ func (vs *ViewServer) Get(args *GetArgs, reply *GetReply) error {
   defer vs.mu.Unlock()
 
   reply.View = vs.currentView
-
-
+  
   return nil
 }
 
@@ -93,6 +92,7 @@ func (vs *ViewServer) tick() {
     var duration = time.Now().Sub(lastPingTime)
     if duration > (PingInterval * DeadPings) {
       // The server is considered dead...
+      //fmt.Printf("Killing server: %s\n", server)
       delete(vs.timeKeeper, server)
       if(server == vs.currentView.Primary) {
         if vs.currentView.Viewnum == vs.primaryView.Viewnum {
@@ -105,8 +105,18 @@ func (vs *ViewServer) tick() {
           vs.primaryView.Backup = ""
         }
       }
+      
+      if(server == vs.currentView.Backup) {
+        vs.currentView.Viewnum++
+        vs.currentView.Backup = ""
+      }
+  
+      //fmt.Printf("View Service: Current View: (%s, %s)\n", vs.currentView.Primary, vs.currentView.Backup)    
+      
     }
   }
+  
+  
 }
 
 //

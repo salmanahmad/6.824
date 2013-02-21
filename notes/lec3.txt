@@ -1,0 +1,4 @@
+The way that I see it - no. There would be additional work that is needed to ensure that the two disks are kept in sync with one another. There are many things that can happen on disk that are not accounted for by the authors "Environment Instruction Assumption".
+
+The main concern that I have is that the "activity stream" seen by both disks will be different. This can be caused by things like virtual memory page faults, non-deterministic caching schemes, and other subtle issues like create random or temporary files. In cases where the disk contents "diverge" the hypervisor needs to not issue *identical* instructions to the VMs; but rather, needs to issue *equivalent* instructions. For example, reading or writing a file would translate to an instruction sequence that reads or write a certain disk block. However, if the file is on different sectors of the disk, then writing the *same* block on both disks is most likely an error.
+

@@ -2,20 +2,23 @@ package pbservice
 
 import "viewservice"
 import "net/rpc"
-// You'll probably need to uncomment this:
-// import "time"
-
+import "time"
+import "fmt"
 
 type Clerk struct {
   vs *viewservice.Clerk
+  view viewservice.View
 }
 
 func MakeClerk(vshost string, me string) *Clerk {
   ck := new(Clerk)
   ck.vs = viewservice.MakeClerk(me, vshost)
+  ck.view, _ = ck.vs.Get()
+
   return ck
 }
 
+const DEBUG bool = false
 
 //
 // call() sends an RPC to the rpcname handler on server srv
@@ -56,10 +59,31 @@ func call(srv string, rpcname string,
 // says the key doesn't exist (has never been Put().
 //
 func (ck *Clerk) Get(key string) string {
-
-  // Your code here.
-
-  return "???"
+  args := &GetArgs{}
+  args.Key = key
+  var reply GetReply
+  
+  for {
+    
+    if DEBUG {
+      fmt.Printf("Sending Get Request to: %s\n", ck.view.Primary)
+    }
+    
+    ok := call(ck.view.Primary, "PBServer.Get", args, &reply)
+    if !ok || reply.Err != OK {
+      ck.view, _ = ck.vs.Get()
+      time.Sleep(viewservice.PingInterval)
+      
+      if DEBUG {
+        fmt.Printf("Reply: %s\n", reply.Err)
+      }
+      
+    } else {
+      break
+    }
+  }
+  
+  return reply.Value
 }
 
 //
@@ -67,6 +91,73 @@ func (ck *Clerk) Get(key string) string {
 // must keep trying until it succeeds.
 //
 func (ck *Clerk) Put(key string, value string) {
-
-  // Your code here.
+  args := &PutArgs{}
+  args.Key = key
+  args.Value = value
+  var reply PutReply
+  
+  for {
+    
+    if DEBUG {
+      fmt.Printf("Sending ForwardPut Request\n") 
+    }
+    
+    ok := call(ck.view.Primary, "PBServer.Put", args, &reply)
+    if !ok || reply.Err != OK {
+      ck.view, _ = ck.vs.Get()
+      time.Sleep(viewservice.PingInterval)
+    } else {
+      break
+    }
+  }
 }
+
+
+func (ck *Clerk) ForwardPut(theArgs *PutArgs) {
+  args := &PutArgs{}
+  args.Key = theArgs.Key
+  args.Value = theArgs.Value
+  var reply PutReply
+  
+  for {
+    if ck.view.Backup == "" {
+      break
+    }
+    
+    if DEBUG {
+      fmt.Printf("Sending ForwardPut Request\n")
+      fmt.Printf("ForwardPut: %s\n", ck.view.Backup)
+    }
+    
+    ok := call(ck.view.Backup, "PBServer.ForwardPut", args, &reply)
+    if !ok || reply.Err != OK {
+      ck.view, _ = ck.vs.Get()
+      time.Sleep(viewservice.PingInterval)
+    } else {
+      break
+    }
+  }
+}
+
+func (ck *Clerk) SetData(data map[string]string) {
+  args := &SetDataArgs{}
+  args.Data = data
+  var reply SetDataReply
+  
+  for {
+    var server = ck.view.Backup
+    
+    if DEBUG {
+      fmt.Printf("Sending SetData Request\n") 
+    }
+    
+    ok := call(server, "PBServer.SetData", args, &reply)
+    if !ok || reply.Err != OK {
+      ck.view, _ = ck.vs.Get()
+      time.Sleep(viewservice.PingInterval)
+    } else {
+      break
+    }
+  }
+}
+

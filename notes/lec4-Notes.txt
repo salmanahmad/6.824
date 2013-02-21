@@ -1,0 +1,27 @@
+
+
+FDS
+
+* Cluster storage systems
+* blobs - blob ID
+
+* Sharded + Partitioned
+	- Leverage many many many servers and disks
+	- Thousands of disks worth of throughputs
+	- Allows you to install and upgrade the number of servers
+	- Automated failure and recovery...
+
+* When reading a paper the important things to look for:
+	- What is the service to the client (the API)
+	- Layout of distributed and shareded data
+	- Finding the data (impacts fault tolerance and performance)
+	- Add server
+	- Replication
+	- Respond to failure and re-replicate
+	- Failure model 
+	- Intuitive semantics and gaurantees (consistency, example: eventual consistency) 
+	- Good performance
+	- Ease of use and usefulness
+
+* Stripping
+* 

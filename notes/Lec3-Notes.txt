@@ -1,0 +1,26 @@
+
+Goals of primary/backup:
+* Availability
+* Correctness
+
+Previously we handled single-fail-stop. 
+Now we are going to handle network failures or partitions (temporary or permanent).
+We are also going to handle repair.
+
+
+How to ensure replicas have the same state?
+* Copy whole state
+* Start same. Same ops. Same order. Assume determism. They end up with identical state.
+
+
+Lab 2 Goals
+* Tolerate fail-stop + net failtures
+* Reaplcement
+* View Server - the view server is a single point of a failure
+* You are trading off correctness with availability
+* Handles split-brain nicely
+* The view server determines "aliveness" by pinging.
+
+
+
+

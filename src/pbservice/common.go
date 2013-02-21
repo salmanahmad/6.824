@@ -27,3 +27,11 @@ type GetReply struct {
 
 
 // Your RPC definitions here.
+
+type SetDataArgs struct {
+  Data map[string]string
+}
+
+type SetDataReply struct {
+  Err Err
+}

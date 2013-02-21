@@ -145,6 +145,8 @@ func TestBasicFail(t *testing.T) {
 func TestFailPut(t *testing.T) {
   runtime.GOMAXPROCS(4)
 
+  //fmt.Printf("TestFailPut...\n")
+
   tag := "failput"
   vshost := port(tag+"v", 1)
   vs := viewservice.StartServer(vshost)
@@ -169,6 +171,8 @@ func TestFailPut(t *testing.T) {
   if v1.Primary != s1.me || v1.Backup != s2.me {
     t.Fatalf("wrong primary or backup")
   }
+
+  //fmt.Printf("Checking...(%s, %s)\n", s1.me, s2.me)
 
   ck := MakeClerk(vshost, "")
 

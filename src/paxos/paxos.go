@@ -168,13 +168,16 @@ func (px *Paxos) Propose(instance int, value interface{}) {
       
       if acceptOkCount > agreementThreshold {
         // We got agreement on the decided value. Send it out...
+        
+        var decidedArgs = &DecidedArgs{instance, maxAcceptedProposalValue}
+        var decidedReply DecidedReply
+        
         for peer := range px.peers {
-          var decidedArgs = &DecidedArgs{instance, maxAcceptedProposalValue}
-          var decidedReply DecidedReply
-          
           call(px.peers[peer], "Paxos.Decided", decidedArgs, &decidedReply)
         }
         
+        // Local Delivery... because we can...
+        px.Decided(decidedArgs, &decidedReply)
         break
       }
     }    
@@ -370,7 +373,13 @@ func (px *Paxos) Min() int {
 // it should not contact other Paxos peers.
 //
 func (px *Paxos) Status(seq int) (bool, interface{}) {
+  px.mu.Lock()
+  defer px.mu.Unlock()
+  
   var instance = px.GetInstance(seq)
+  
+  //fmt.Printf("Status Of: %v. Agreement: %v. Value: %v.\n", px.peers[px.me], instance.agreementReached, instance.value)
+  
   return instance.agreementReached, instance.value
 }
 

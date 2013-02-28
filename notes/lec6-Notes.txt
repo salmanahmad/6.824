@@ -1,0 +1,52 @@
+HARP File Systems
+
+2b + 1 Servers - You can tolerate b failures
+
+Failures:
+1) Unreachable
+2) Partitioned
+3) Power failure
+4) Crash and restart with no RAM but disk intact (kernel crash)
+5) Server reboot but no disk and no RAM
+
+Log contents:
+
+CREATE
+MKDIR
+READ
+_______
+request id
+saved reply
+
+5 Pointers into the log:
+
+GLB: Global Lower Bound (all systems have done it)
+LB: Lower Bound (it has written to disk. The file system has confirmed.)
+AP: Application Point (it has made the system call. The apply process is a different process in the kernel, hence the second pointer)
+CP: Commit Point. It replies to the client when all the backups have acked and the then moves up the commit point
+FP: Furthest point
+
+
+
+Failure Scenarios:
+
+All scenarios have 5 servers.
+
+S1 S2 S3 S4 S5
+
+S1 - Primary
+S2 - Backup
+S3 - "
+S4 - Witness (Promoted)
+S5 - Witness
+
+
+
+The AP CANNOT go past the CP. The disk is strictly a prefix of the log. This impacts the performance of the system but it is done to ensure that the primary does not do something that the backups have not seen.
+
+
+UPS will give a signal to HARP so that harp will stop accepting client requests and begin writing to disk.
+
+
+
+

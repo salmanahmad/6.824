@@ -1,0 +1,10 @@
+
+The main reason why HARP is faster seems to be described directly in the paper on page 10:
+
+"Harp performs slightly better than the unreplicated server; this is because we replace a disk write with a message roundtrip, which is faster in our environment."
+
+The reason why it is faster in their environment is that all of the servers in the replica group are connected by a high speed network and they are all in a cluster close to each other (most probably all on the same rack). Network reads and writes are often faster in this case than a disk read because the distance to travel is so short.
+
+Of course, the network time is not the only thing that happens. The reads and write need to be applied to a log. However, since that log is stored in volatile memory, the cost of doing this is substantially smaller than either the network or disk usage. 
+
+I would imagine that some operations will be slower, in particular operations that involve writing more than 2MB of data. The reason for this is that the log size is bounded at 2MB. Whenever a percentage of that limit is reached the system flushes its log to disk. Thus, if you have many "large" writes in a row, you can no longer ignore the cost for the disk access and it will start to dominate and slow HARP down.

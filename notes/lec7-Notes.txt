@@ -1,0 +1,18 @@
+
+== Spanner ==
+
+Sharding with Paxos (We will discuss)
+Performance despite WAN synchronous replication
+Fast reads - just use local replica (We will discuss)
+Clever use of time
+Distributed transactions (we will discuss this later in the course)
+
+
+== Sharding ==
+
+Masters: M1 M2 M3 (Maps between shard numbers and which replica group is responsible for that shard)
+
+G1: S1 S2 S3
+
+G2: S4 S5 S6
+

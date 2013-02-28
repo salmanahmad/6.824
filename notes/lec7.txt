@@ -1,0 +1,6 @@
+
+Large error bounds will cause more Spanner operations to block until they are brought up to date. 
+
+As an example, Suppose there are 3 client operations that are executed from three different clients: R1 W1 R2. R1 attempts to read a particular timestamp, W1 attempts to write a value, and R2 attempts to read again. Since these three requests come from three different clients lets assume that they all arrive "at the same time" and the Paxos agreed order is: {R1, W1, R2}. However, because 
+the timestamps have a large error bound R2 will have to wait until the W1 error bound finishes so that the system can ensure that there is no other write that took place between W1 and R2. Thus, R2 will have to block and wait close to 10 seconds before it can return its value.
+

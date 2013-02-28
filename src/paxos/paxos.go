@@ -29,6 +29,20 @@ import "sync"
 import "fmt"
 import "math/rand"
 
+// Start Salman Additions
+import "container/list"
+// End Salman Additions
+
+func Max(a int, b int) int {
+  var max int
+  if a > b {
+    max = a
+  } else {
+    max = b
+  }
+  
+  return max
+}
 
 type Paxos struct {
   mu sync.Mutex
@@ -51,6 +65,10 @@ type Instance struct {
   value interface{}
 }
 
+func NewInstance() Instance {
+  return Instance{false, -1, -1, nil}
+}
+
 type PrepareArgs struct {
   Instance int
   Proposal int
@@ -58,6 +76,7 @@ type PrepareArgs struct {
 
 type PrepareReply struct {
   Ok bool
+  SuggestedNextProposal int
   MaxAcceptedProposal int
   Value interface{}
 }
@@ -70,24 +89,117 @@ type AcceptArgs struct {
 
 type AcceptReply struct {
   Ok bool
+  SuggestedNextProposal int
+}
+
+type DecidedArgs struct {
+  Instance int
+  Value interface{}
+}
+
+type DecidedReply struct {
+  Ok bool
 }
 
 func (px *Paxos) Propose(instance int, value interface{}) {
   var proposal = 0
+  var nextProposal = -1
+  
   for {
+    nextProposal += 1
+    proposal = nextProposal
+    
+    var prepareReplies = list.New()
+    var agreementThreshold = len(px.peers) / 2
+    
     for peer := range px.peers {
-      //call(peer, "Paxos.Prepare", )
+      var prepareArgs = &PrepareArgs{instance, proposal}
+      var prepareReply PrepareReply
+      
+      ok := call(px.peers[peer], "Paxos.Prepare", prepareArgs, &prepareReply)
+      if ok {
+        prepareReplies.PushBack(prepareReply)
+      }
     }
+    
+    var prepareOkCount = 0
+    var maxAcceptedProposalValue interface{} = value
+    var maxAcceptedProposal int = -1
+    
+    for e := prepareReplies.Front(); e != nil; e = e.Next() {
+    	var reply = e.Value.(PrepareReply)
+      if reply.Ok {
+    	  prepareOkCount += 1
+        
+        if reply.MaxAcceptedProposal != -1 {
+          if reply.MaxAcceptedProposal > maxAcceptedProposal {
+            maxAcceptedProposal = reply.MaxAcceptedProposal
+            maxAcceptedProposalValue = reply.Value
+          }
+        }
+    	} else {
+    	  nextProposal = Max(nextProposal, reply.SuggestedNextProposal)
+    	}
+    }
+    
+    var acceptReplies = list.New()
+    
+    if (prepareOkCount > agreementThreshold) {
+      // We got agreement on the proposal number
+      for peer := range px.peers {
+        var acceptArgs = &AcceptArgs{instance, proposal, maxAcceptedProposalValue}
+        var acceptReply AcceptReply
+        
+        ok := call(px.peers[peer], "Paxos.Accept", acceptArgs, &acceptReply)
+        if ok {
+          acceptReplies.PushBack(acceptReply)
+        }
+      }
+      
+      var acceptOkCount = 0
+      for e := acceptReplies.Front(); e != nil; e = e.Next() {
+        var reply = e.Value.(AcceptReply)
+        if reply.Ok {
+          acceptOkCount += 1
+        } else {
+          nextProposal = Max(nextProposal, reply.SuggestedNextProposal)
+        }
+      }
+      
+      if acceptOkCount > agreementThreshold {
+        // We got agreement on the decided value. Send it out...
+        for peer := range px.peers {
+          var decidedArgs = &DecidedArgs{instance, maxAcceptedProposalValue}
+          var decidedReply DecidedReply
+          
+          call(px.peers[peer], "Paxos.Decided", decidedArgs, &decidedReply)
+        }
+        
+        break
+      }
+    }    
   }
 }
 
-func (px *Paxos) Prepare(args *PrepareArgs, reply *PrepareReply) {
+func (px *Paxos) GetInstance(seq int) *Instance {
+  var instance, found = px.instances[seq]
+  if !found {
+    px.instances[seq] = NewInstance()
+    instance = px.instances[seq]
+  }
+  
+  return &instance
+}
+
+func (px *Paxos) Prepare(args *PrepareArgs, reply *PrepareReply) error {
   px.mu.Lock()
   defer px.mu.Unlock()
   
-  var instance = px.instances[args.Instance]
+  var instance = px.GetInstance(args.Instance)
   if args.Proposal > instance.maxPromisedProposal {
     instance.maxPromisedProposal = args.Proposal
+    
+    px.instances[args.Instance] = *instance
     
     reply.MaxAcceptedProposal = instance.maxAcceptedProposal
     reply.Value = instance.value
@@ -95,23 +207,43 @@ func (px *Paxos) Prepare(args *PrepareArgs, reply *PrepareReply) {
   } else {
     reply.Ok = false
   }
+  
+  return nil
 }
 
-func (px *Paxos) Accept(args *AcceptArgs, reply *AcceptReply) {
+func (px *Paxos) Accept(args *AcceptArgs, reply *AcceptReply) error {
   px.mu.Lock()
   defer px.mu.Unlock()
   
-  var instance = px.instances[args.Instance]
+  var instance = px.GetInstance(args.Instance)
   if args.Proposal >= instance.maxPromisedProposal {
     instance.maxPromisedProposal = args.Proposal
     instance.maxAcceptedProposal = args.Proposal
     instance.value = args.Value
     
+    px.instances[args.Instance] = *instance
+    
     reply.Ok = true
   } else {
     reply.Ok = false
   }
+  
+  return nil
 }
+
+func (px *Paxos) Decided(args *DecidedArgs, reply *DecidedReply) error {
+  px.mu.Lock()
+  defer px.mu.Unlock()
+  
+  var i = px.GetInstance(args.Instance)
+  i.value = args.Value
+  i.agreementReached = true
+  px.instances[args.Instance] = *i
+  
+  reply.Ok = true
+  return nil
+}
+
 
 //
 // call() sends an RPC to the rpcname handler on server srv
@@ -156,11 +288,10 @@ func call(srv string, name string, args interface{}, reply interface{}) bool {
 // is reached.
 //
 func (px *Paxos) Start(seq int, v interface{}) {
-  // Your code here.
   px.mu.Lock()
   defer px.mu.Unlock()
   
-  var instance = Instance{}
+  var instance = NewInstance()
   px.instances[seq] = instance
   
   go px.Propose(seq, v)
@@ -174,6 +305,7 @@ func (px *Paxos) Start(seq int, v interface{}) {
 //
 func (px *Paxos) Done(seq int) {
   // Your code here.
+  fmt.Printf("Done!\n")
 }
 
 //
@@ -182,8 +314,15 @@ func (px *Paxos) Done(seq int) {
 // this peer.
 //
 func (px *Paxos) Max() int {
-  // Your code here.
-  return 0
+  px.mu.Lock()
+  defer px.mu.Unlock()
+  
+  var seq = -1
+  for key := range(px.instances) {
+    seq = Max(seq, key)
+  }
+    
+  return seq
 }
 
 //
@@ -219,6 +358,7 @@ func (px *Paxos) Max() int {
 // 
 func (px *Paxos) Min() int {
   // You code here.
+  fmt.Printf("Hi!\n")
   return 0
 }
 
@@ -230,7 +370,7 @@ func (px *Paxos) Min() int {
 // it should not contact other Paxos peers.
 //
 func (px *Paxos) Status(seq int) (bool, interface{}) {
-  var instance = px.instances[seq]
+  var instance = px.GetInstance(seq)
   return instance.agreementReached, instance.value
 }
 
@@ -256,9 +396,7 @@ func Make(peers []string, me int, rpcs *rpc.Server) *Paxos {
   px := &Paxos{}
   px.peers = peers
   px.me = me
-
-
-  // Your initialization code here.
+  
   // Start Salman Addition
   px.instances = make(map[int]Instance)
   // End Salman Addition

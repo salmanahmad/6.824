@@ -38,9 +38,79 @@ type Paxos struct {
   rpcCount int
   peers []string
   me int // index into peers[]
+  
+  // Begin Salman Additions
+  instances map[int]Instance
+  // End Salman Additions
+}
 
+type Instance struct {
+  agreementReached bool
+  maxPromisedProposal int
+  maxAcceptedProposal int
+  value interface{}
+}
 
-  // Your data here.
+type PrepareArgs struct {
+  Instance int
+  Proposal int
+}
+
+type PrepareReply struct {
+  Ok bool
+  MaxAcceptedProposal int
+  Value interface{}
+}
+
+type AcceptArgs struct {
+  Instance int
+  Proposal int
+  Value interface{}
+}
+
+type AcceptReply struct {
+  Ok bool
+}
+
+func (px *Paxos) Propose(instance int, value interface{}) {
+  var proposal = 0
+  for {
+    for peer := range px.peers {
+      //call(peer, "Paxos.Prepare", )
+    }
+  }
+}
+
+func (px *Paxos) Prepare(args *PrepareArgs, reply *PrepareReply) {
+  px.mu.Lock()
+  defer px.mu.Unlock()
+  
+  var instance = px.instances[args.Instance]
+  if args.Proposal > instance.maxPromisedProposal {
+    instance.maxPromisedProposal = args.Proposal
+    
+    reply.MaxAcceptedProposal = instance.maxAcceptedProposal
+    reply.Value = instance.value
+    reply.Ok = true
+  } else {
+    reply.Ok = false
+  }
+}
+
+func (px *Paxos) Accept(args *AcceptArgs, reply *AcceptReply) {
+  px.mu.Lock()
+  defer px.mu.Unlock()
+  
+  var instance = px.instances[args.Instance]
+  if args.Proposal >= instance.maxPromisedProposal {
+    instance.maxPromisedProposal = args.Proposal
+    instance.maxAcceptedProposal = args.Proposal
+    instance.value = args.Value
+    
+    reply.Ok = true
+  } else {
+    reply.Ok = false
+  }
 }
 
 //
@@ -87,6 +157,13 @@ func call(srv string, name string, args interface{}, reply interface{}) bool {
 //
 func (px *Paxos) Start(seq int, v interface{}) {
   // Your code here.
+  px.mu.Lock()
+  defer px.mu.Unlock()
+  
+  var instance = Instance{}
+  px.instances[seq] = instance
+  
+  go px.Propose(seq, v)
 }
 
 //
@@ -153,8 +230,8 @@ func (px *Paxos) Min() int {
 // it should not contact other Paxos peers.
 //
 func (px *Paxos) Status(seq int) (bool, interface{}) {
-  // Your code here.
-  return false, nil
+  var instance = px.instances[seq]
+  return instance.agreementReached, instance.value
 }
 
 
@@ -182,6 +259,9 @@ func Make(peers []string, me int, rpcs *rpc.Server) *Paxos {
 
 
   // Your initialization code here.
+  // Start Salman Addition
+  px.instances = make(map[int]Instance)
+  // End Salman Addition
 
   if rpcs != nil {
     // caller will create socket &c

@@ -31,6 +31,7 @@ import "math/rand"
 
 // Start Salman Additions
 import "container/list"
+import "time"
 // End Salman Additions
 
 func Max(a int, b int) int {
@@ -208,7 +209,9 @@ func (px *Paxos) Propose(instance int, value interface{}) {
         
         break
       }
-    }    
+    }
+    
+    time.Sleep(10 * time.Millisecond) 
   }
 }
 

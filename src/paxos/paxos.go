@@ -215,6 +215,13 @@ func (px *Paxos) Prepare(args *PrepareArgs, reply *PrepareReply) error {
   
   px.maxReportedDones[args.Me] = Max(px.maxReportedDones[args.Me], args.MaxDone)
   
+  var min = px.Min()
+  for instance := range(px.instances) {
+    if instance < min {
+      delete(px.instances, instance)
+    }
+  }
+  
   var instance = px.GetInstance(args.Instance)
   if args.Proposal > instance.maxPromisedProposal {
     instance.maxPromisedProposal = args.Proposal
@@ -308,7 +315,6 @@ func call(srv string, name string, args interface{}, reply interface{}) bool {
 // is reached.
 //
 func (px *Paxos) Start(seq int, v interface{}) {
-  // TODO: GC
   px.mu.Lock()
   defer px.mu.Unlock()
   

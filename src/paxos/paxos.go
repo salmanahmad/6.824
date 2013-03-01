@@ -131,9 +131,14 @@ func (px *Paxos) Propose(instance int, value interface{}) {
       var prepareArgs = &PrepareArgs{instance, proposal, me, px.maxReportedDones[me]}
       var prepareReply PrepareReply
       
-      ok := call(px.peers[peer], "Paxos.Prepare", prepareArgs, &prepareReply)
-      if ok {
+      if peer == px.me {
+        px.Prepare(prepareArgs, &prepareReply)
         prepareReplies.PushBack(prepareReply)
+      } else {
+        ok := call(px.peers[peer], "Paxos.Prepare", prepareArgs, &prepareReply)
+        if ok {
+          prepareReplies.PushBack(prepareReply)
+        } 
       }
     }
     
@@ -165,10 +170,16 @@ func (px *Paxos) Propose(instance int, value interface{}) {
         var acceptArgs = &AcceptArgs{instance, proposal, maxAcceptedProposalValue}
         var acceptReply AcceptReply
         
-        ok := call(px.peers[peer], "Paxos.Accept", acceptArgs, &acceptReply)
-        if ok {
+        if(peer == px.me) {
+          px.Accept(acceptArgs, &acceptReply)
           acceptReplies.PushBack(acceptReply)
+        } else {
+          ok := call(px.peers[peer], "Paxos.Accept", acceptArgs, &acceptReply)
+          if ok {
+            acceptReplies.PushBack(acceptReply)
+          }
         }
+        
       }
       
       var acceptOkCount = 0
@@ -188,11 +199,13 @@ func (px *Paxos) Propose(instance int, value interface{}) {
         var decidedReply DecidedReply
         
         for peer := range px.peers {
-          call(px.peers[peer], "Paxos.Decided", decidedArgs, &decidedReply)
+          if peer == px.me {
+            px.Decided(decidedArgs, &decidedReply)
+          } else {
+            call(px.peers[peer], "Paxos.Decided", decidedArgs, &decidedReply) 
+          }
         }
         
-        // Local Delivery... because we can...
-        px.Decided(decidedArgs, &decidedReply)
         break
       }
     }    

@@ -44,6 +44,17 @@ func Max(a int, b int) int {
   return max
 }
 
+func Min(a int, b int) int {
+  var min int
+  if a < b {
+    min = a
+  } else {
+    min = b
+  }
+  
+  return min
+}
+
 type Paxos struct {
   mu sync.Mutex
   l net.Listener
@@ -55,6 +66,7 @@ type Paxos struct {
   
   // Begin Salman Additions
   instances map[int]Instance
+  maxReportedDones map[string]int
   // End Salman Additions
 }
 
@@ -72,6 +84,8 @@ func NewInstance() Instance {
 type PrepareArgs struct {
   Instance int
   Proposal int
+  Me string
+  MaxDone int
 }
 
 type PrepareReply struct {
@@ -113,7 +127,8 @@ func (px *Paxos) Propose(instance int, value interface{}) {
     var agreementThreshold = len(px.peers) / 2
     
     for peer := range px.peers {
-      var prepareArgs = &PrepareArgs{instance, proposal}
+      var me = px.peers[px.me]
+      var prepareArgs = &PrepareArgs{instance, proposal, me, px.maxReportedDones[me]}
       var prepareReply PrepareReply
       
       ok := call(px.peers[peer], "Paxos.Prepare", prepareArgs, &prepareReply)
@@ -197,6 +212,8 @@ func (px *Paxos) GetInstance(seq int) *Instance {
 func (px *Paxos) Prepare(args *PrepareArgs, reply *PrepareReply) error {
   px.mu.Lock()
   defer px.mu.Unlock()
+  
+  px.maxReportedDones[args.Me] = Max(px.maxReportedDones[args.Me], args.MaxDone)
   
   var instance = px.GetInstance(args.Instance)
   if args.Proposal > instance.maxPromisedProposal {
@@ -291,8 +308,13 @@ func call(srv string, name string, args interface{}, reply interface{}) bool {
 // is reached.
 //
 func (px *Paxos) Start(seq int, v interface{}) {
+  // TODO: GC
   px.mu.Lock()
   defer px.mu.Unlock()
+  
+  if seq < px.Min() {
+    return
+  }
   
   var instance = NewInstance()
   px.instances[seq] = instance
@@ -307,8 +329,10 @@ func (px *Paxos) Start(seq int, v interface{}) {
 // see the comments for Min() for more explanation.
 //
 func (px *Paxos) Done(seq int) {
-  // Your code here.
-  fmt.Printf("Done!\n")
+  px.mu.Lock()
+  defer px.mu.Unlock()
+  
+  px.maxReportedDones[px.peers[px.me]] = Max(px.maxReportedDones[px.peers[px.me]], seq)
 }
 
 //
@@ -317,9 +341,6 @@ func (px *Paxos) Done(seq int) {
 // this peer.
 //
 func (px *Paxos) Max() int {
-  px.mu.Lock()
-  defer px.mu.Unlock()
-  
   var seq = -1
   for key := range(px.instances) {
     seq = Max(seq, key)
@@ -360,9 +381,12 @@ func (px *Paxos) Max() int {
 // instances.
 // 
 func (px *Paxos) Min() int {
-  // You code here.
-  fmt.Printf("Hi!\n")
-  return 0
+  var min = px.maxReportedDones[px.peers[px.me]]
+  for peer := range(px.maxReportedDones) {
+    min = Min(px.maxReportedDones[peer], min)
+  }
+  
+  return min + 1
 }
 
 //
@@ -375,6 +399,10 @@ func (px *Paxos) Min() int {
 func (px *Paxos) Status(seq int) (bool, interface{}) {
   px.mu.Lock()
   defer px.mu.Unlock()
+  
+  if seq < px.Min() {
+    return false, nil
+  }
   
   var instance = px.GetInstance(seq)
   
@@ -408,6 +436,12 @@ func Make(peers []string, me int, rpcs *rpc.Server) *Paxos {
   
   // Start Salman Addition
   px.instances = make(map[int]Instance)
+  px.maxReportedDones = make(map[string]int)
+  
+  for peer := range(px.peers) {
+    px.maxReportedDones[px.peers[peer]] = -1
+  }
+    
   // End Salman Addition
 
   if rpcs != nil {

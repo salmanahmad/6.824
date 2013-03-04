@@ -70,7 +70,7 @@ func setup(tag string, unreliable bool) ([]string, []int64, [][]string, [][]*Sha
     }
   }
 
-  clean := func() { mcleanup(sma) ; cleanup(sa) }
+  clean := func() { cleanup(sa) ; mcleanup(sma) }
   return smh, gids, ha, sa, clean
 }
 
@@ -132,7 +132,7 @@ func TestBasic(t *testing.T) {
 }
 
 func TestMove(t *testing.T) {
-  smh, gids, ha, _, clean := setup("basic", false)
+  smh, gids, ha, _, clean := setup("move", false)
   defer clean()
 
   fmt.Printf("Test: Shards really move ...\n")
@@ -190,7 +190,7 @@ func TestMove(t *testing.T) {
 }
 
 func TestLimp(t *testing.T) {
-  smh, gids, ha, sa, clean := setup("basic", false)
+  smh, gids, ha, sa, clean := setup("limp", false)
   defer clean()
 
   fmt.Printf("Test: Reconfiguration with some dead replicas ...\n")
@@ -254,7 +254,7 @@ func TestLimp(t *testing.T) {
 }
 
 func doConcurrent(t *testing.T, unreliable bool) {
-  smh, gids, ha, _, clean := setup("conc", unreliable)
+  smh, gids, ha, _, clean := setup("conc"+strconv.FormatBool(unreliable), unreliable)
   defer clean()
 
   mck := shardmaster.MakeClerk(smh)

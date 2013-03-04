@@ -55,7 +55,6 @@ func (kv *ShardKV) tick() {
 
 
 // tell the server to shut itself down.
-// please do not change this function.
 func (kv *ShardKV) kill() {
   kv.dead = true
   kv.l.Close()
@@ -81,6 +80,7 @@ func StartServer(gid int64, shardmasters []string,
   kv.sm = shardmaster.MakeClerk(shardmasters)
 
   // Your initialization code here.
+  // Don't call Join().
 
   rpcs := rpc.NewServer()
   rpcs.Register(kv)

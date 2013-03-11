@@ -1,0 +1,31 @@
+
+First Lecture on Consistency.
+
+Talk about memory and storage system, typically.
+
+Meaning of reads and writes.
+
+Performance vs ease of programming.
+
+Today: sequential consistency.
+Strict consistency
+	Load and stores are stamped with issue time <-- Spanner does not use issue time
+	Rule 1: Loads sees value from most recent stores in order of time
+	Rule 2: Each machine executes in program order
+
+Sequential consistency
+	There exists an order of all operations such that:
+	1) Each machines operation appear in program order
+	2) Reads the value from most recent write in that order
+
+Ivy
+	Page modes: INV, RO, RW
+	Invariants: A page is either RW on only one, INV on all others, or RO on >= 1, RW on none
+	
+	
+
+
+
+
+
+

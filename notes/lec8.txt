@@ -1,0 +1,3 @@
+
+Yes - not signing the fetch operations could allow a malicious server to break the fetch-modify and fork consistency properties. The main reason has to do with the fact that users always check the previous history in the file system's log. It is important to include the fetch statements because otherwise it would be easier to trick clients into accepting a fork. This is particular true in file systems because it is very likely that a file has been written once and then read many times. By not logging fetches, it makes it really easy for the malicious server to maintain a separate fork for each client.
+

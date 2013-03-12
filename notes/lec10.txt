@@ -1,0 +1,5 @@
+
+I think that this answer depends on what the question means by "simply sent all modifications of variables". It depends on if "variables" means actual program variables or memory pages. If "variables" means an actual variable, there are many problems. First of all, it is obviously possible for a variable to span multiple memory pages and if all we are sending is that data, we could cause alignment issues in memory that "overwrite" other variables in the memory space. 
+
+However, if we assume that variables are, in fact, pages of memory, then the key missing information that Treadmarks sends (that Dreadmarks does not) is the "interval" information along with the pages that have been invalidated (rather than sending the actual modifications themselves). A specific situation that Treadmarks will provide better memory behavior is if the variables span multiple memory pages. In Dreadmarks, we essentially have to send the entire memory space every since time a new processors wants to acquire the lock. This is not only inefficient but unnecessary. Treadmarks optimizes which pages should be sent by using intervals.
+

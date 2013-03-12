@@ -1,0 +1,38 @@
+
+DSM - Distributed Shared Memory
+
+Interplay between consistency and performance
+
+Consistency model
+	Contract between programmer and system
+	Rules for programmers
+	System guarantees
+
+Reads seeing writes - an intuitive model but hard to get good performance.
+
+Fix the performance problems with Ivy
+
+Treadmarks
+	False sharing - two variables
+	Write amplification - one byte write turns into a whole page move over network
+
+Goal: Multiple writable copies
+	Don't invalidate on write
+	Don't downgrade r/w on reads
+	Multiple different copies
+
+Ivy - the page faults are what triggers sharing page data
+
+Treadmarks - Release Consistency - broadcast write diffs on release to all copies of page(s).
+
+There is not one lock per-page. There is a lock pool, and the programmer has to use their own locks over shared variables and they need to ensure that the locking logic is correct.
+	
+
+Lazy RC
+	Only send diffs to next lock holder
+
+Rules
+	Every variable are protected
+	Must lock around every write
+	
+

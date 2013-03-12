@@ -56,7 +56,7 @@ func waitn(t *testing.T, pxa[]*Paxos, seq int, wanted int) {
 }
 
 func waitmajority(t *testing.T, pxa[]*Paxos, seq int) {
-  waitn(t, pxa, seq, len(pxa) / 2)
+  waitn(t, pxa, seq, (len(pxa) / 2) + 1)
 }
 
 func checkmax(t *testing.T, pxa[]*Paxos, seq int, max int) {

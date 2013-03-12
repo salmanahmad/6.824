@@ -415,7 +415,7 @@ func (px *Paxos) Min() int {
 // the application wants to know whether this
 // peer thinks an instance has been decided,
 // and if so what the agreed value is. Status()
-// should just inspect the local peers state;
+// should just inspect the local peer state;
 // it should not contact other Paxos peers.
 //
 func (px *Paxos) Status(seq int) (bool, interface{}) {

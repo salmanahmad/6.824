@@ -47,9 +47,11 @@ func (kv *KVPaxos) Poll(seq int) interface{} {
   to := 10 * time.Millisecond
   for {
     decided, value := kv.px.Status(seq)
+    
     if decided {
       return value
     }
+    
     time.Sleep(to)
     if to < 10 * time.Second {
       to *= 2
@@ -59,6 +61,52 @@ func (kv *KVPaxos) Poll(seq int) interface{} {
   return nil
 }
 
+
+func (kv *KVPaxos) ClearLog() {
+  var min = kv.px.Min()
+  var max = kv.px.Max()
+      
+  var putKeys map[string]int = make(map[string]int)
+  var duplicatePutKeys map[string]int = make(map[string]int)
+  var minDone int = 0
+      
+  for i := max; i >= min; i-- {
+    // Search the log
+    var done, value = kv.px.Status(i)
+        
+    if !done {
+      if i <= minDone {
+        minDone = i
+      }
+    } else {
+      var op = value.(Op)
+          
+      if (op.Type == PUT) {
+        var _, found = putKeys[op.Key]
+        if found {
+          var _, duplicateFound = duplicatePutKeys[op.Key]
+          if !duplicateFound {
+            duplicatePutKeys[op.Key] = i
+          }
+        } else {
+          putKeys[op.Key] = 1
+        }
+      }
+    }
+  }
+      
+  var done = -1
+  for key, _ := range(duplicatePutKeys) {
+    var value = duplicatePutKeys[key]
+    if done == -1 || value <= done {
+      done = value
+    }
+  }
+      
+  if done > minDone {
+    kv.px.Done(done)
+  }
+}
 
 func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
   kv.mu.Lock()
@@ -93,6 +141,7 @@ func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
         }
       }
       
+      kv.ClearLog()
       break
     }
   }
@@ -119,6 +168,7 @@ func (kv *KVPaxos) Put(args *PutArgs, reply *PutReply) error {
     var agreedValue = kv.Poll(seq)
     
     if agreedValue == operation {
+      kv.ClearLog()
       break
     }
   }

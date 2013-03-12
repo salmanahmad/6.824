@@ -11,11 +11,22 @@ import "syscall"
 import "encoding/gob"
 import "math/rand"
 
+// Begin Salman Additions
+import "time"
+// End Salman Additions
+
+const (
+  PUT = "PUT"
+  GET = "GET"
+)
 
 type Op struct {
-  // Your definitions here.
-  // Field names must start with capital letters,
-  // otherwise RPC will break.
+  // Begin Salman Additions
+  // TODO: I need to add some sort of thing to identify this request...the client request ide or something...
+  Type string
+  Key string
+  Value string
+  // End Salman Additions
 }
 
 type KVPaxos struct {
@@ -26,23 +37,94 @@ type KVPaxos struct {
   unreliable bool // for testing
   px *paxos.Paxos
 
-  // Your definitions here.
+  // Begin Salman Addition
+  
+  // End Salman Addition
 }
 
 
+func (kv *KVPaxos) Poll(seq int) interface{} {
+  to := 10 * time.Millisecond
+  for {
+    decided, value := kv.px.Status(seq)
+    if decided {
+      return value
+    }
+    time.Sleep(to)
+    if to < 10 * time.Second {
+      to *= 2
+    }
+  }
+  
+  return nil
+}
+
 
 func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
-  // Your code here.
-
-
+  kv.mu.Lock()
+  defer kv.mu.Unlock()
+  
+  var operation = Op {}
+  operation.Type = GET
+  operation.Key = args.Key
+  operation.Value = ""
+  
+  for {
+    var seq = kv.px.Max()
+    seq++
+    
+    kv.px.Start(seq, operation)
+    var agreedValue = kv.Poll(seq)
+    
+    if agreedValue == operation {
+      var min = kv.px.Min()
+      
+      for i := seq; i >= min; i-- {
+        // Search the log
+        var done, value = kv.px.Status(i)
+        
+        if done {
+          var op = value.(Op)
+          
+          if (op.Type == PUT) && (op.Key == args.Key) {
+            reply.Value = op.Value
+            break
+          }
+        }
+      }
+      
+      break
+    }
+  }
+  
+  reply.Err = OK
   return nil
 }
 
 
 func (kv *KVPaxos) Put(args *PutArgs, reply *PutReply) error {
-  // Your code here.
-
-
+  kv.mu.Lock()
+  defer kv.mu.Unlock()
+  
+  var operation = Op {}
+  operation.Type = PUT
+  operation.Key = args.Key
+  operation.Value = args.Value
+  
+  for {
+    var seq = kv.px.Max()
+    seq++
+      
+    kv.px.Start(seq, operation)
+    var agreedValue = kv.Poll(seq)
+    
+    if agreedValue == operation {
+      break
+    }
+  }
+  
+  reply.Err = OK
+  
   return nil
 }
 

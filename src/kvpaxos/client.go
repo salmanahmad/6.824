@@ -61,8 +61,10 @@ func call(srv string, rpcname string,
 //
 func (ck *Clerk) Get(key string) string {
   args := &GetArgs{}
-  args.Key = key
+  args.ClientId = ck.uuid
   args.Id, _ = GenUUID()
+  args.Key = key
+  
   
   for {
     // try each known server.
@@ -85,9 +87,11 @@ func (ck *Clerk) Get(key string) string {
 func (ck *Clerk) Put(key string, value string) {
   // You will have to modify this function.
   args := &PutArgs{}
+  args.ClientId = ck.uuid
+  args.Id, _ = GenUUID()
   args.Key = key
   args.Value = value
-  args.Id, _ = GenUUID()
+  
   
   for {
     for _, srv := range ck.servers {

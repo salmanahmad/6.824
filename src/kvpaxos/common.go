@@ -32,6 +32,7 @@ type PutArgs struct {
   
   // Begin Salman Additions
   Id string
+  ClientId string
   // End Salman Additions
 }
 
@@ -44,6 +45,7 @@ type GetArgs struct {
   
   // Begin Salman Additions
   Id string
+  ClientId string
   // End Salman Additions
 }
 

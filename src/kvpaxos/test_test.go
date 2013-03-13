@@ -33,7 +33,7 @@ func cleanup(kva []*KVPaxos) {
     }
   }
 }
-
+/*
 func TestBasic(t *testing.T) {
   runtime.GOMAXPROCS(4)
 
@@ -174,7 +174,7 @@ func TestDone(t *testing.T) {
 
   fmt.Printf("  ... Passed\n")
 }
-
+*/
 func pp(tag string, src int, dst int) string {
   s := "/var/tmp/824-"
   s += strconv.Itoa(os.Getuid()) + "/"
@@ -212,7 +212,7 @@ func part(t *testing.T, tag string, npaxos int, p1 []int, p2 []int, p3 []int) {
     }
   }
 }
-
+/*
 func TestPartition(t *testing.T) {
   runtime.GOMAXPROCS(4)
 
@@ -314,7 +314,7 @@ func TestPartition(t *testing.T) {
 
   fmt.Printf("  ... Passed\n")
 }
-
+*/
 func TestUnreliable(t *testing.T) {
   runtime.GOMAXPROCS(4)
 
@@ -391,9 +391,12 @@ func TestUnreliable(t *testing.T) {
 
   fmt.Printf("  ... Passed\n")
 
+  //t.Fatalf("......")
+
   fmt.Printf("Test: Concurrent clients, unreliable ...\n")
 
   for iters := 0; iters < 20; iters++ {
+    fmt.Printf("Passed (%d)...\n", iters)
     const ncli = 15
     var ca [ncli]chan bool
     for cli := 0; cli < ncli; cli++ {
@@ -432,6 +435,7 @@ func TestUnreliable(t *testing.T) {
   time.Sleep(1 * time.Second)
 }
 
+/*
 func TestHole(t *testing.T) {
   runtime.GOMAXPROCS(4)
 
@@ -625,3 +629,4 @@ func TestManyPartition(t *testing.T) {
     fmt.Printf("  ... Passed\n")
   }
 }
+*/

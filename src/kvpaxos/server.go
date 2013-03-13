@@ -31,6 +31,11 @@ type Op struct {
   // End Salman Additions
 }
 
+type Response struct {
+  Err Err
+  Value string
+}
+
 type KVPaxos struct {
   mu sync.Mutex
   l net.Listener
@@ -42,7 +47,7 @@ type KVPaxos struct {
   // Begin Salman Addition
   nextStart int
   data map[string]string
-  lastClientRequests map[string]string
+  pastClientRequestResponses map[string]Response
   // End Salman Addition
 }
 
@@ -50,18 +55,15 @@ type KVPaxos struct {
 func (kv *KVPaxos) Poll(seq int) interface{} {
   to := 10 * time.Millisecond
   for {
-    //fmt.Printf("Polling (%d, %d)...\n", kv.me, seq)
-    
     decided, value := kv.px.Status(seq)
     
     if decided {
-      //fmt.Printf("Decided (%d): %v!\n", seq, value )
       return value
     }
     
     time.Sleep(to)
     if to < 10 * time.Second {
-      //to *= 2
+      to *= 2
     }
   }
   
@@ -69,17 +71,13 @@ func (kv *KVPaxos) Poll(seq int) interface{} {
 }
 
 func (kv *KVPaxos) InsertOperationIntoLog(operation Op) int {
-  // TODO: What about holes? Should this be Max?
   var seq = kv.nextStart
   
   for {
-    //fmt.Printf("Attempting Insert in: %d\n", seq)
-    
     kv.px.Start(seq, operation)
     var agreedValue = kv.Poll(seq)
     
     if agreedValue == operation {
-      //fmt.Printf("Agreement!\n")
       break
     }
     
@@ -89,6 +87,41 @@ func (kv *KVPaxos) InsertOperationIntoLog(operation Op) int {
   return seq
 }
 
+func (kv *KVPaxos) ProcessLog(start int, stop int) {
+  for i := start; i <= stop; i++ {
+    var done, value = kv.px.Status(i)
+    
+    if done {
+      var currentOp Op = value.(Op)
+      
+      if currentOp.Type == GET {
+        var _, pastResponseFound = kv.pastClientRequestResponses[currentOp.Id]
+        if !pastResponseFound {
+          var response = Response{}
+          
+          var keyValue, keyFound = kv.data[currentOp.Key]
+          if keyFound {
+            response.Err = OK
+            response.Value = keyValue
+          } else {
+            response.Err = ErrNoKey
+          }
+          
+          kv.pastClientRequestResponses[currentOp.Id] = response
+        }
+      } else if currentOp.Type == PUT {
+        var _, pastResponseFound = kv.pastClientRequestResponses[currentOp.Id]
+        if !pastResponseFound {
+          var response = Response{}
+          response.Err = OK
+          kv.pastClientRequestResponses[currentOp.Id] = response
+          
+          kv.data[currentOp.Key] = currentOp.Value
+        }
+      }
+    }
+  }
+}
 
 func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
   kv.mu.Lock()
@@ -101,53 +134,28 @@ func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
   operation.Key = args.Key
   operation.Value = ""
   
-  //fmt.Printf("\n<<<\n")
-  //fmt.Printf("Starting GET (%d) for (%v): %v\n", kv.me, operation.Key, operation.Id)
+  
+  var response, found = kv.pastClientRequestResponses[operation.Id]
+  if found {
+    reply.Err = response.Err
+    reply.Value = response.Value
+    return nil
+  }
   
   var seq int = kv.InsertOperationIntoLog(operation)
   
-  //var start = kv.px.Min()
   var start = kv.nextStart
-  //var stop = kv.px.Max()
   var stop = seq
   
-  //fmt.Printf("Conditions: %d) %d %d\n", kv.me, start, stop)
+  kv.ProcessLog(start, stop)
   
-  for i := start; i <= stop; i++ {
-    var done, value = kv.px.Status(i)
-    
-    //fmt.Printf("...\n")
-    
-    if done {
-      var currentOp Op = value.(Op)
-      
-      if currentOp.Type == GET {
-        //fmt.Printf("GET (%d, %d): %v\n", kv.me, i, currentOp.Id)
-        if kv.lastClientRequests[currentOp.ClientId] != currentOp.Id {
-          kv.lastClientRequests[currentOp.ClientId] = currentOp.Id
-          if currentOp == operation {
-            var keyValue, keyFound = kv.data[currentOp.Key]
-            if keyFound {
-              reply.Err = OK
-              reply.Value = keyValue
-            } else {
-              reply.Err = ErrNoKey
-            }
-          }
-        } else {
-          //fmt.Printf("Skipping...\n")
-        }
-      } else if currentOp.Type == PUT {
-        if kv.lastClientRequests[currentOp.ClientId] != currentOp.Id {
-          kv.lastClientRequests[currentOp.ClientId] = currentOp.Id
-          kv.data[currentOp.Key] = currentOp.Value
-          //fmt.Printf("PUT (%d, %d) for(%v , %v): %v\n", kv.me, i, currentOp.Key, currentOp.Value, currentOp.Id)
-          
-        }
-      }
-    }
+  
+  response, found = kv.pastClientRequestResponses[operation.Id]
+  if found {
+    reply.Err = response.Err
+    reply.Value = response.Value
   }
-  //fmt.Printf("\n>>>\n")
+  
   kv.px.Done(stop)
   kv.nextStart = stop + 1
   
@@ -166,38 +174,23 @@ func (kv *KVPaxos) Put(args *PutArgs, reply *PutReply) error {
   operation.Key = args.Key
   operation.Value = args.Value
   
-  //fmt.Printf("\n---\n")
-  //fmt.Printf("Starting PUT (%d) for(%v , %v): %v\n", kv.me, operation.Key, operation.Value, operation.Id)
-
-  var seq int = kv.InsertOperationIntoLog(operation)
-  
-  //var start = kv.px.Min()
-  var start = kv.nextStart
-  //var stop = kv.px.Max()
-  var stop = seq
-  
-  for i := start; i <= stop; i++ {
-    var done, value = kv.px.Status(i)
-    
-    if done {
-      var currentOp Op = value.(Op)
-      
-      if currentOp.Type == GET {
-        //fmt.Printf("GET (%d, %d): %v\n", kv.me, i, currentOp.Id)
-        if kv.lastClientRequests[currentOp.ClientId] != currentOp.Id {
-          kv.lastClientRequests[currentOp.ClientId] = currentOp.Id
-        }
-      } else if currentOp.Type == PUT {
-        if kv.lastClientRequests[currentOp.ClientId] != currentOp.Id {
-          kv.lastClientRequests[currentOp.ClientId] = currentOp.Id
-          kv.data[currentOp.Key] = currentOp.Value
-          //fmt.Printf("PUT (%d, %d) for(%v , %v): %v\n", kv.me, i, currentOp.Key, currentOp.Value, currentOp.Id)
-        }
-      }
-    }
+  var response, found = kv.pastClientRequestResponses[operation.Id]
+  if found {
+    reply.Err = response.Err
+    return nil
   }
   
-  //fmt.Printf("\n---\n")
+  var seq int = kv.InsertOperationIntoLog(operation)
+  
+  var start = kv.nextStart
+  var stop = seq
+  
+  kv.ProcessLog(start, stop)
+  
+  response, found = kv.pastClientRequestResponses[operation.Id]
+  if found {
+    reply.Err = response.Err
+  }
   
   kv.px.Done(stop)
   kv.nextStart = stop + 1
@@ -232,7 +225,7 @@ func StartServer(servers []string, me int) *KVPaxos {
 
   // Start Salman Addition
   kv.data = make(map[string]string)
-  kv.lastClientRequests = make(map[string]string)
+  kv.pastClientRequestResponses = make(map[string]Response)
   // Start Salman Addition
 
 

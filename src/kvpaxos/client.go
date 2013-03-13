@@ -60,16 +60,13 @@ func call(srv string, rpcname string,
 // keeps trying forever in the face of all other errors.
 //
 func (ck *Clerk) Get(key string) string {
+  args := &GetArgs{}
+  args.Key = key
+  args.Id, _ = GenUUID()
+  
   for {
     // try each known server.
     for _, srv := range ck.servers {
-      args := &GetArgs{}
-      args.Key = key
-      
-      // Begin Salman Additions
-      args.Id, _ = GenUUID()
-      // End Salman Additions
-      
       var reply GetReply
       ok := call(srv, "KVPaxos.Get", args, &reply)
       if ok && (reply.Err == OK || reply.Err == ErrNoKey) {
@@ -87,17 +84,13 @@ func (ck *Clerk) Get(key string) string {
 //
 func (ck *Clerk) Put(key string, value string) {
   // You will have to modify this function.
-
+  args := &PutArgs{}
+  args.Key = key
+  args.Value = value
+  args.Id, _ = GenUUID()
+  
   for {
     for _, srv := range ck.servers {
-      args := &PutArgs{}
-      args.Key = key
-      args.Value = value
-      
-      // Begin Salman Additions
-      args.Id, _ = GenUUID()
-      // End Salman Additions
-      
       var reply PutReply
       ok := call(srv, "KVPaxos.Put", args, &reply)
       if ok && reply.Err == OK {

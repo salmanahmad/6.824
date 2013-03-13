@@ -164,6 +164,20 @@ func (kv *KVPaxos) Put(args *PutArgs, reply *PutReply) error {
   operation.Key = args.Key
   operation.Value = args.Value
   
+  var start = kv.px.Min()
+  var stop = kv.px.Max()
+  
+  for i := start; i <= stop; i++ {
+    var done, value = kv.px.Status(i)
+    if done {
+      var op = value.(Op)
+      if op  == operation {
+        reply.Err = OK
+        return nil
+      }
+    }
+  }
+  
   var seq = kv.px.Max()
   
   for {

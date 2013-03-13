@@ -24,6 +24,7 @@ type Op struct {
   // Begin Salman Additions
   // TODO: I need to add some sort of thing to identify this request...the client request ide or something...
   Type string
+  Id string
   Key string
   Value string
   // End Salman Additions
@@ -114,11 +115,13 @@ func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
   
   var operation = Op {}
   operation.Type = GET
+  operation.Id = args.Id
   operation.Key = args.Key
   operation.Value = ""
   
+  var seq = kv.px.Max()
+  
   for {
-    var seq = kv.px.Max()
     seq++
     
     kv.px.Start(seq, operation)
@@ -157,11 +160,13 @@ func (kv *KVPaxos) Put(args *PutArgs, reply *PutReply) error {
   
   var operation = Op {}
   operation.Type = PUT
+  operation.Id = args.Id
   operation.Key = args.Key
   operation.Value = args.Value
   
+  var seq = kv.px.Max()
+  
   for {
-    var seq = kv.px.Max()
     seq++
       
     kv.px.Start(seq, operation)

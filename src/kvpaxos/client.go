@@ -5,14 +5,21 @@ import "time"
 
 type Clerk struct {
   servers []string
-  // You will have to modify this struct.
+  
+  // Begin Salman Additions
+  uuid string
+  // End Salman Additions
 }
 
 
 func MakeClerk(servers []string) *Clerk {
   ck := new(Clerk)
   ck.servers = servers
-  // You'll have to add code here.
+  
+  // Begin Salman Additions
+  ck.uuid, _ = GenUUID()
+  // End Salman Additions
+  
   return ck
 }
 
@@ -53,13 +60,16 @@ func call(srv string, rpcname string,
 // keeps trying forever in the face of all other errors.
 //
 func (ck *Clerk) Get(key string) string {
-  // You will have to modify this function.
-
   for {
     // try each known server.
     for _, srv := range ck.servers {
       args := &GetArgs{}
       args.Key = key
+      
+      // Begin Salman Additions
+      args.Id, _ = GenUUID()
+      // End Salman Additions
+      
       var reply GetReply
       ok := call(srv, "KVPaxos.Get", args, &reply)
       if ok && (reply.Err == OK || reply.Err == ErrNoKey) {
@@ -83,6 +93,11 @@ func (ck *Clerk) Put(key string, value string) {
       args := &PutArgs{}
       args.Key = key
       args.Value = value
+      
+      // Begin Salman Additions
+      args.Id, _ = GenUUID()
+      // End Salman Additions
+      
       var reply PutReply
       ok := call(srv, "KVPaxos.Put", args, &reply)
       if ok && reply.Err == OK {

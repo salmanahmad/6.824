@@ -160,10 +160,10 @@ func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
     return nil
   }
   
-  kv.InsertOperationIntoLog(operation)
+  var seq int = kv.InsertOperationIntoLog(operation)
   
   var start = kv.nextStart
-  var stop = kv.px.Max()
+  var stop = seq
   
   kv.ProcessLog(start, stop)
   
@@ -171,8 +171,6 @@ func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
   if found {
     reply.Err = response.Err
     reply.Value = response.Value
-  } else {
-    //fmt.Printf("oooo\n")
   }
   
   kv.px.Done(stop)
@@ -199,18 +197,16 @@ func (kv *KVPaxos) Put(args *PutArgs, reply *PutReply) error {
     return nil
   }
   
-  kv.InsertOperationIntoLog(operation)
+  var seq int = kv.InsertOperationIntoLog(operation)
   
   var start = kv.nextStart
-  var stop = kv.px.Max()
+  var stop = seq
   
   kv.ProcessLog(start, stop)
   
   response, found = kv.pastClientRequestResponses[operation.Id]
   if found {
     reply.Err = response.Err
-  } else {
-    //fmt.Printf("oooo\n")
   }
   
   kv.px.Done(stop)

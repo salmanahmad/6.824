@@ -1,0 +1,13 @@
+
+
+Vector timestamps - version vectors - highest seq from each host
+
+VT Comparisons:
+	
+	a < b - for all i a[i] <= b[i] and there exists a j that a[j] < b[j]
+	
+	The "conflict" operator (predicate thing)
+		a || b - exists and i and j that a[i] < b[i] and a[j] > b[j]
+
+Isis Project - CBCAST
+

@@ -1,0 +1,6 @@
+
+Let's just think the case of the node that copies file A to file B. The dependency check and merge procedures for the other node is just the reverse case.
+
+One possible way to handle this is to have a dependency check that checks that both files exists and that the expect value of A is "foo". Note that we do not make any assumptions as to the contents of B. Our update script will write the contents of "foo" into file B. Thus, when the update finishes, we know for a fact that both A and B have "foo". The merge procedure can be handled in two ways. The first option is to check if both of the files have the same content. If they do, then don't do anything. If they do not have the same content, read the contents of A and copy that into B. This will effectively perform the "copy" operation as intended. Also, it guarantees that at the end of the operation, no matter what the order, both A and B will have the same content which is the desired output of a "copy" operation.
+
+Bayou will ensure that all nodes agree because it will eventually agree on the consistent global ordering for the update log. This ordering will work in conjunction with the dependency checks outlined above. It does not matter if Node 1's update comes first or Node 2's update comes first - the outcome is the same that both A and B have the same content.

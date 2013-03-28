@@ -1,0 +1,22 @@
+
+The idea of using a log to create an order is a really awesome idea. The log is the real state of the system, rather than a database, is a really cool concept.
+
+Central server is the obvious answer. 
+
+1) Occasional Internet.
+
+2) Point-to-point connection.
+
+
+Ordered Update Log - Ordered update log of update functions. 
+
+Causality
+	A adds mtg <25, A>
+	A syncs with B
+	B deletes the mtg <17, B>
+	
+	It does not always assign the current time to the operation.
+	It uses the max of current time stamp and the highest seen timestamp + 1.
+	Lamport Clock
+	
+Z's ID is really <Tz,X> --- The Key thing here is the Tz will the lowest TS that Z ever issues.

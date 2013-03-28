@@ -1,0 +1,5 @@
+
+This is actually a fairly straight forward case. If I am understanding the question correctly, when the partition is repaired (merged) and the machines can talk to each other again, Ficus will perform an operation that, essentially, amounts to replacing B's "Foo" with A's "Foo". It may actually use one of their resolvers, but the outcome is the same - the file contents of B's "Foo" will be updated to be identical to A's. 
+
+The way that Ficus can tell that only A updated "Foo" is because of the version vectors. When it detects that the two files are different, it will check the version vectors and realize that B's Foo's vector is a "prefix" of A's Foo's vector. This means that B did not touch "Foo", while A has.
+

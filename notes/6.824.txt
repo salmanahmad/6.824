@@ -1,0 +1,23 @@
+Performance
+Faulty Tolerance
+	Goals:
+		Availability
+		Durability
+		Consistency - data contract - data read returns the last data written
+	Faults (failures to cope with):
+		Network
+			- packet loss, duplicated packets, out of order requests - TCP does not solve this because requests may span multiple tcp requests
+			- Temporary or permanent failure (network partition) - can cause your data to diverge
+		Server
+			- Crashes and restarts
+			- Crashes and does not restart (hardware failure)
+			- Site wide failure (power goes out in the city, earth quake) - all servers fail at the same time
+			- Bugs
+			- Malice (someone breaks in)
+			- Client failure (crash mid-transaction)
+	Idea to copy with faults:
+		- Retry
+		- Replication
+		- Repair
+		- 
+Consistency

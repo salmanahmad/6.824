@@ -91,7 +91,6 @@ func (kv *KVPaxos) InsertOperationIntoLog(operation Op) int {
     agreedValue = kv.Poll(seq).(Op)
     
     if agreedValue == operation {
-      //fmt.Printf("%d InsertingSeq%d) %v --- %v\n", kv.me, seq, operation, agreedValue)
       break
     }
     

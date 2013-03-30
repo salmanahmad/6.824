@@ -11,13 +11,16 @@ type Clerk struct {
   sm *shardmaster.Clerk
   config shardmaster.Config
   // You'll have to modify Clerk.
+  
+  clientId string
+  requestId int
 }
 
 
 func MakeClerk(shardmasters []string) *Clerk {
   ck := new(Clerk)
-  ck.sm = shardmaster.MakeClerk(shardmasters)
-  // You'll have to modify MakeClerk.
+  ck.sm = shardmaster.MakeClerk(shardmasters)  
+  ck.clientId = GenUUID()
   return ck
 }
 
@@ -77,7 +80,8 @@ func (ck *Clerk) Get(key string) string {
 
 
   // You'll have to modify Get().
-
+  ck.requestId++
+  
   for {
     shard := key2shard(key)
 
@@ -90,6 +94,8 @@ func (ck *Clerk) Get(key string) string {
       for _, srv := range servers {
         args := &GetArgs{}
         args.Key = key
+        args.ClientId = ck.clientId
+        args.RequestId = ck.requestId
         var reply GetReply
         ok := call(srv, "ShardKV.Get", args, &reply)
         if ok && (reply.Err == OK || reply.Err == ErrNoKey) {
@@ -112,6 +118,7 @@ func (ck *Clerk) Put(key string, value string) {
 
 
   // You'll have to modify Put().
+  ck.requestId++
 
   for {
     shard := key2shard(key)
@@ -127,6 +134,8 @@ func (ck *Clerk) Put(key string, value string) {
         args := &PutArgs{}
         args.Key = key
         args.Value = value
+        args.ClientId = ck.clientId
+        args.RequestId = ck.requestId
         var reply PutReply
         ok := call(srv, "ShardKV.Put", args, &reply)
         if ok && reply.Err == OK {
@@ -139,5 +148,33 @@ func (ck *Clerk) Put(key string, value string) {
 
     // ask master for a new configuration.
     ck.config = ck.sm.Query(-1)
+  }
+}
+
+
+
+func (ck *Clerk) PutShard(servers []string, configNum int, database map[string]string) {
+  ck.mu.Lock()
+  defer ck.mu.Unlock()
+
+  ck.requestId++
+
+  for {
+
+    // try each server in the shard's replication group.
+    for _, srv := range servers {
+      args := &PutShardArgs{}
+      args.ConfigNum = configNum
+      args.Database = database
+      args.ClientId = ck.clientId
+      args.RequestId = ck.requestId
+      var reply PutShardReply
+      ok := call(srv, "ShardKV.PutShard", args, &reply)
+      if ok && reply.Err == OK {
+        return
+      }
+    }
+
+    time.Sleep(100 * time.Millisecond)
   }
 }

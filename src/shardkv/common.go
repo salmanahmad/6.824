@@ -59,6 +59,7 @@ type GetReply struct {
 
 type PutShardArgs struct {
   ConfigNum int
+  Shard int
   Database map[string]string
   
   ClientId string

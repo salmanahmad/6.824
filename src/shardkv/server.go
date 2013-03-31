@@ -30,6 +30,7 @@ type Op struct {
   Config shardmaster.Config
   
   ConfigNum int
+  Shard int
   Database map[string]string
 }
 
@@ -52,13 +53,26 @@ type ShardKV struct {
   gid int64 // my replica group ID
   
   nextPaxosSeq int
-  configurationLock sync.Mutex
-  configurationChannel chan int
   database map[string]string
   lastClientReplies map[string]Reply
   
+  shardkvClerk *Clerk
   currentConfig shardmaster.Config
-  nextConfig shardmaster.Config
+  obtainedShards map[int]bool
+  
+}
+
+func (kv *ShardKV) ProcessingConfiguration() bool {
+  for shard, gid := range kv.currentConfig.Shards {
+    if gid == kv.gid {
+      var found, obtained = kv.obtainedShards[shard]
+      if !(obtained && found) {
+        return true
+      }
+    }
+  }
+  
+  return false
 }
 
 func (kv *ShardKV) Poll(seq int) interface{} {
@@ -100,22 +114,141 @@ func (kv *ShardKV) InsertOperationIntoLog(operation Op) int {
 
 func (kv *ShardKV) ProcessLog(stop int) Reply {
   var start = kv.nextPaxosSeq
-  
-  var lastReply Reply = Reply{}
+  var returnReply Reply = Reply{}
   
   for i := start; i <= stop; i++ {
+    var done, value = kv.px.Status(i)
     
+    if done {
+      var currentOp Op = value.(Op)
+      var lastReply Reply = kv.lastClientReplies[currentOp.ClientId]
+      
+      var reply = Reply{}
+      reply.ClientId = currentOp.ClientId
+      reply.RequestId = currentOp.RequestId
+      
+      if currentOp.Type == PutType {
+        if lastReply.RequestId >= currentOp.RequestId {
+          // TODO: This may not be correct...
+          returnReply = lastReply
+        } else {
+          if kv.ProcessingConfiguration() {
+            // We are in the middle of a reconfiguration
+            reply.Err = ErrWrongGroup
+            kv.lastClientReplies[reply.ClientId] = reply
+            returnReply = reply
+          } else {
+            if kv.currentConfig.Shards[key2shard(currentOp.Key)] == kv.gid {
+              reply.Err = OK
+              kv.lastClientReplies[reply.ClientId] = reply
+              returnReply = reply
+            
+              kv.database[currentOp.Key] = currentOp.Value
+            } else {
+              reply.Err = ErrWrongGroup
+              kv.lastClientReplies[reply.ClientId] = reply
+              returnReply = reply
+            }
+          }
+        }
+      } else if currentOp.Type == GetType {
+        if lastReply.RequestId >= currentOp.RequestId {
+          // TODO: This may not be correct...
+          returnReply = lastReply
+        } else {
+          if kv.ProcessingConfiguration() {
+            // We are in the middle of a reconfiguration
+            reply.Err = ErrWrongGroup
+            kv.lastClientReplies[reply.ClientId] = reply
+            returnReply = reply
+          } else {
+            if kv.currentConfig.Shards[key2shard(currentOp.Key)] == kv.gid {
+              reply.Err = OK
+              reply.Value = kv.database[currentOp.Key]
+              kv.lastClientReplies[reply.ClientId] = reply
+              returnReply = reply
+            } else {
+              reply.Err = ErrWrongGroup
+              kv.lastClientReplies[reply.ClientId] = reply
+              returnReply = reply
+            }
+          }
+        }
+      } else if currentOp.Type == ConfigType {
+        if currentOp.Config.Num == kv.currentConfig.Num + 1 {
+          // This is the next configuration from where we are now, so we will accept it.
+          
+          for shard, gid := range kv.currentConfig.Shards {
+            if gid == kv.gid {
+              // I currently own this shard. I need to send it...
+              var destinationGid = currentOp.Config.Shards[shard]
+              if destinationGid != gid {
+                // I am not next owner. So I actually need to send it...
+                
+                var database = make(map[string]string)
+                for key, value := range kv.database {
+                  if key2shard(key) == shard {
+                    database[key] = value
+                  }
+                }
+                
+                kv.shardkvClerk.PutShard(currentOp.Config.Groups[destinationGid], currentOp.Config.Num, database)
+              }
+            }
+          }
+          
+          kv.currentConfig = currentOp.Config
+          kv.obtainedShards = make(map[int]bool)
+          returnReply = Reply{}
+          returnReply.Err = OK
+          
+          for key, _ := range kv.database {
+            if kv.currentConfig.Shards[key2shard(key)] != kv.gid {
+              // This is not my key anymore...
+              delete(kv.database, key)
+            }
+          }
+        } else if currentOp.Config.Num <= kv.currentConfig.Num {
+          // We have already seen this configuration.
+          returnReply = Reply{}
+          returnReply.Err = OK
+        } else {
+          // We are not ready for this configuration yet.
+          returnReply = Reply{}
+          returnReply.Err = ErrWrongGroup
+        }
+      } else if currentOp.Type == PutShardType {
+        if (currentOp.ConfigNum == kv.currentConfig.Num) && 
+           (kv.ProcessingConfiguration())  {
+          // This is the database that we were waiting for.
+          
+          kv.obtainedShards[currentOp.Shard] = true
+          
+          for key, value := range currentOp.Database {
+            kv.database[key] = value
+          }
+          
+          returnReply = Reply{}
+          returnReply.Err = OK
+        } else if currentOp.ConfigNum <= kv.currentConfig.Num {
+          // We already got this database. Thanks, though!
+          returnReply = Reply{}
+          returnReply.Err = OK
+        } else {
+          // We have not seen this configuration yet. Try again.
+          returnReply = Reply{}
+          returnReply.Err = ErrWrongGroup
+        }
+      }
+    }
   }
   
-  return lastReply
+  return returnReply
 }
 
 func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
   kv.mu.Lock()
   defer kv.mu.Unlock()
-  
-  kv.configurationLock.Lock()
-  defer kv.configurationLock.Unlock()
   
   var op Op = Op{}
   op.Id = GenUUID()
@@ -140,9 +273,6 @@ func (kv *ShardKV) Put(args *PutArgs, reply *PutReply) error {
   kv.mu.Lock()
   defer kv.mu.Unlock()
   
-  kv.configurationLock.Lock()
-  defer kv.configurationLock.Unlock()
-  
   var op Op = Op{}
   op.Id = GenUUID()
   op.Type = PutType
@@ -163,8 +293,8 @@ func (kv *ShardKV) Put(args *PutArgs, reply *PutReply) error {
 }
 
 func (kv *ShardKV) PutShard(args *PutShardArgs, reply *PutShardReply) error {
-  kv.configurationLock.Lock()
-  defer kv.configurationLock.Unlock()
+  kv.mu.Lock()
+  defer kv.mu.Unlock()
   
   var op Op = Op{}
   op.Id = GenUUID()
@@ -172,6 +302,7 @@ func (kv *ShardKV) PutShard(args *PutShardArgs, reply *PutShardReply) error {
   op.ClientId = args.ClientId
   op.RequestId = args.RequestId
   op.ConfigNum = args.ConfigNum
+  op.Shard = args.Shard
   op.Database = args.Database
   
   var stop int = kv.InsertOperationIntoLog(op)
@@ -193,8 +324,6 @@ func (kv *ShardKV) tick() {
   kv.mu.Lock()
   defer kv.mu.Unlock()
   
-  kv.configurationLock.Lock()
-  
   var previousConfigNum int = kv.currentConfig.Num
   var stop int = -1
   
@@ -212,24 +341,9 @@ func (kv *ShardKV) tick() {
     }
   }
   
-  if stop != -1 {
-    kv.ProcessLog(stop)
-    kv.px.Done(stop)
-    kv.nextPaxosSeq = stop + 1
-    
-    var nextConfigurationNum = kv.nextConfig.Num
-    
-    kv.configurationLock.Unlock()
-    
-    for {
-      var configurationNum int = <- kv.configurationChannel
-      if  nextConfigurationNum == configurationNum {
-        break
-      }
-    }
-  } else {
-    kv.configurationLock.Unlock()
-  }
+  kv.ProcessLog(stop)
+  kv.px.Done(stop)
+  kv.nextPaxosSeq = stop + 1
 }
 
 
@@ -260,10 +374,10 @@ func StartServer(gid int64, shardmasters []string,
   
   // Your initialization code here.
   // Don't call Join().
-  kv.configurationChannel = make(chan int)
   kv.database = make(map[string]string)
   kv.lastClientReplies = make(map[string]Reply)
-
+  kv.obtainedShards = make(map[int]bool)
+  kv.shardkvClerk = MakeClerk(shardmasters)
   
   rpcs := rpc.NewServer()
   rpcs.Register(kv)

@@ -63,10 +63,16 @@ type ShardKV struct {
 }
 
 func (kv *ShardKV) ProcessingConfiguration() bool {
+  if kv.currentConfig.Num == 0 || kv.currentConfig.Num == 1 {
+    return false
+  }
+  
   for shard, gid := range kv.currentConfig.Shards {
     if gid == kv.gid {
       var found, obtained = kv.obtainedShards[shard]
       if !(obtained && found) {
+        //fmt.Printf("Group %d has configuration: %v\n", kv.gid, kv.currentConfig.Shards)
+        //fmt.Printf("I am still waiting for shard: %d\n", shard)
         return true
       }
     }
@@ -175,8 +181,13 @@ func (kv *ShardKV) ProcessLog(stop int) Reply {
           }
         }
       } else if currentOp.Type == ConfigType {
-        if currentOp.Config.Num == kv.currentConfig.Num + 1 {
-          // This is the next configuration from where we are now, so we will accept it.
+        if (currentOp.Config.Num == kv.currentConfig.Num + 1) &&
+           (!kv.ProcessingConfiguration()) {
+          // We have processed the last configuration and
+          // this is the next one. We will accept it.
+          
+          //fmt.Printf("Transitioning to a new view\n")
+          kv.obtainedShards = make(map[int]bool)
           
           for shard, gid := range kv.currentConfig.Shards {
             if gid == kv.gid {
@@ -192,13 +203,17 @@ func (kv *ShardKV) ProcessLog(stop int) Reply {
                   }
                 }
                 
-                kv.shardkvClerk.PutShard(currentOp.Config.Groups[destinationGid], currentOp.Config.Num, database)
+                //fmt.Printf("Group %d sending shard %d to group %d\n", kv.gid, shard, destinationGid)
+                //fmt.Printf("Current configuration: %v\n", currentOp.Config.Shards)
+                
+                kv.shardkvClerk.PutShard(currentOp.Config.Groups[destinationGid], currentOp.Config.Num, shard, database)
+              } else {
+                kv.obtainedShards[shard]  = true
               }
             }
           }
           
           kv.currentConfig = currentOp.Config
-          kv.obtainedShards = make(map[int]bool)
           returnReply = Reply{}
           returnReply.Err = OK
           
@@ -221,6 +236,8 @@ func (kv *ShardKV) ProcessLog(stop int) Reply {
         if (currentOp.ConfigNum == kv.currentConfig.Num) && 
            (kv.ProcessingConfiguration())  {
           // This is the database that we were waiting for.
+          
+             //fmt.Printf("Got shard: %d\n", currentOp.Shard)
           
           kv.obtainedShards[currentOp.Shard] = true
           
@@ -250,6 +267,8 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
   kv.mu.Lock()
   defer kv.mu.Unlock()
   
+  //fmt.Printf("Processing Get\n")
+  
   var op Op = Op{}
   op.Id = GenUUID()
   op.Type = GetType
@@ -270,8 +289,11 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 }
 
 func (kv *ShardKV) Put(args *PutArgs, reply *PutReply) error {
+  
   kv.mu.Lock()
   defer kv.mu.Unlock()
+  
+  //fmt.Printf("Processing Put\n")
   
   var op Op = Op{}
   op.Id = GenUUID()
@@ -295,6 +317,8 @@ func (kv *ShardKV) Put(args *PutArgs, reply *PutReply) error {
 func (kv *ShardKV) PutShard(args *PutShardArgs, reply *PutShardReply) error {
   kv.mu.Lock()
   defer kv.mu.Unlock()
+  
+  //fmt.Printf("Processing PutShard\n")
   
   var op Op = Op{}
   op.Id = GenUUID()
@@ -324,26 +348,29 @@ func (kv *ShardKV) tick() {
   kv.mu.Lock()
   defer kv.mu.Unlock()
   
-  var previousConfigNum int = kv.currentConfig.Num
+  //fmt.Printf("Tick...\n")
+  
   var stop int = -1
   
   for {
-    var config shardmaster.Config = kv.sm.Query(previousConfigNum + 1)
-    if config.Num != previousConfigNum {
+    var config shardmaster.Config = kv.sm.Query(kv.currentConfig.Num + 1)
+    
+    if config.Num == kv.currentConfig.Num + 1 {
       var op Op = Op{}
       op.Id = GenUUID()
       op.Type = ConfigType
       op.Config = config
       
+      //fmt.Printf("Inserting Operation: %v\n", op)
+      
       stop = kv.InsertOperationIntoLog(op)
+      kv.ProcessLog(stop)
+      kv.px.Done(stop)
+      kv.nextPaxosSeq = stop + 1
     } else {
       break
     }
   }
-  
-  kv.ProcessLog(stop)
-  kv.px.Done(stop)
-  kv.nextPaxosSeq = stop + 1
 }
 
 

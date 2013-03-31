@@ -172,9 +172,11 @@ func (sm *ShardMaster) ProcessLog(stop int) {
       } else if currentOp.Type == Move {
         nextConfig.Shards[currentOp.Shard] = currentOp.GID
       }
+      
+      if currentOp.Type == Join || currentOp.Type == Leave || currentOp.Type == Move {
+        sm.configs = append(sm.configs, nextConfig)
+      }
     }
-    
-    sm.configs = append(sm.configs, nextConfig)
   }
 }
 

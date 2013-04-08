@@ -78,14 +78,12 @@ func (ck *Clerk) Get(key string) string {
   defer ck.mu.Unlock()
   
   // You'll have to modify Get().
-  
-
   for {
+    ck.requestId++
+
     shard := key2shard(key)
     gid := ck.config.Shards[shard]
     servers, ok := ck.config.Groups[gid]
-
-    ck.requestId++
 
     if ok {
       // try each server in the shard's replication group.
@@ -113,7 +111,6 @@ func (ck *Clerk) Get(key string) string {
 func (ck *Clerk) Put(key string, value string) {
   ck.mu.Lock()
   defer ck.mu.Unlock()
-
 
   // You'll have to modify Put().
   for {
@@ -154,7 +151,7 @@ func (ck *Clerk) PutShard(servers []string, configNum int, shard int, database m
 
   for {
     ck.requestId++
-    
+
     // try each server in the shard's replication group.
     for _, srv := range servers {
       args := &PutShardArgs{}

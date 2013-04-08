@@ -71,9 +71,6 @@ func (kv *ShardKV) ProcessingConfiguration() bool {
     if gid == kv.gid {
       var found, obtained = kv.obtainedShards[shard]
       if !(obtained && found) {
-        //fmt.Printf("ProcessingConfig: Group %d has configuration: (%v) %v\n", kv.gid, kv.currentConfig.Num, kv.currentConfig.Shards)
-        //fmt.Printf("ProcessingConfig: Group %d still waiting for shard: %d\n", kv.gid, shard)
-        //fmt.Printf("ProcessingConfig: Group %d has obtained: %v\n", kv.gid, kv.obtainedShards)
         return true
       }
     }
@@ -123,8 +120,6 @@ func (kv *ShardKV) ProcessLog(stop int) Reply {
   var start = kv.nextPaxosSeq
   var returnReply Reply = Reply{}
   
-  //fmt.Printf("\n\n%v\n\n", kv.lastClientReplies)
-  
   for i := start; i <= stop; i++ {
     var done, value = kv.px.Status(i)
     
@@ -162,26 +157,20 @@ func (kv *ShardKV) ProcessLog(stop int) Reply {
         }
       } else if currentOp.Type == GetType {
         if lastReply.RequestId >= currentOp.RequestId {
-          // TODO: This may not be correct...
-          //fmt.Printf("ProcessLog: Get Returning Last Reply: (%v, %v)\n", lastReply.RequestId, currentOp.RequestId)
           returnReply = lastReply
         } else {
           if kv.ProcessingConfiguration() {
-            //fmt.Printf("ProcessLog: Get NOT Returning Last Reply - Processing Configuraiton\n")
             // We are in the middle of a reconfiguration
             reply.Err = ErrWrongGroup
             kv.lastClientReplies[reply.ClientId] = reply
             returnReply = reply
           } else {
-            //fmt.Printf("ProcessLog: Get NOT Returning Last Reply - NOT Processing Configuraiton\n")
             if kv.currentConfig.Shards[key2shard(currentOp.Key)] == kv.gid {
-              //fmt.Printf("ProcessLog: Reply: OK\n")
               reply.Err = OK
               reply.Value = kv.database[currentOp.Key]
               kv.lastClientReplies[reply.ClientId] = reply
               returnReply = reply
             } else {
-              //fmt.Printf("ProcessLog: Reply: ErrWrongGroup: %v\n", kv.currentConfig.Shards)
               reply.Err = ErrWrongGroup
               kv.lastClientReplies[reply.ClientId] = reply
               returnReply = reply
@@ -189,12 +178,10 @@ func (kv *ShardKV) ProcessLog(stop int) Reply {
           }
         }
       } else if currentOp.Type == ConfigType {
-        //fmt.Printf("ProcessLog: Configuration Change!\n")
         if (currentOp.Config.Num == kv.currentConfig.Num + 1) && (!kv.ProcessingConfiguration()) {
           // We have processed the last configuration and
           // this is the next one. We will accept it.
           
-          //fmt.Printf("ProcessLog: Transitioning to a new view: (%v) %v\n", currentOp.Config.Num, currentOp.Config.Shards)
           kv.obtainedShards = make(map[int]bool)
           
           for shard, gid := range kv.currentConfig.Shards {
@@ -211,11 +198,7 @@ func (kv *ShardKV) ProcessLog(stop int) Reply {
                   }
                 }
                 
-                //fmt.Printf("Group %d sending shard %d to group %d\n", kv.gid, shard, destinationGid)
-                //fmt.Printf("Current configuration: %v\n", currentOp.Config.Shards)
-                
                 go kv.shardkvClerk.PutShard(currentOp.Config.Groups[destinationGid], currentOp.Config.Num, shard, database)
-                //fmt.Printf("Hi!\n")
               } else {
                 kv.obtainedShards[shard] = true
               }
@@ -223,8 +206,6 @@ func (kv *ShardKV) ProcessLog(stop int) Reply {
               kv.obtainedShards[shard] = true
             }
           }
-          
-          //fmt.Printf("ProcessLog: %v Obtained Shards:%v\n", kv.gid, kv.obtainedShards)
           
           kv.currentConfig = currentOp.Config
           returnReply = Reply{}
@@ -238,12 +219,10 @@ func (kv *ShardKV) ProcessLog(stop int) Reply {
           }
         } else if currentOp.Config.Num <= kv.currentConfig.Num {
           // We have already seen this configuration.
-          //fmt.Printf("ProcessLog: We have already seen this configuration.\n")
           returnReply = Reply{}
           returnReply.Err = OK
         } else {
           // We are not ready for this configuration yet.
-          //fmt.Printf("ProcessLog: We are not ready for this configuraiton yet.\n")
           returnReply = Reply{}
           returnReply.Err = ErrWrongGroup
         }
@@ -251,9 +230,6 @@ func (kv *ShardKV) ProcessLog(stop int) Reply {
         if (currentOp.ConfigNum == kv.currentConfig.Num) && 
            (kv.ProcessingConfiguration())  {
           // This is the database that we were waiting for.
-          
-          //fmt.Printf("ProcessLog: Got shard: %d\n", currentOp.Shard)
-          
           kv.obtainedShards[currentOp.Shard] = true
           
           for key, value := range currentOp.Database {
@@ -263,13 +239,11 @@ func (kv *ShardKV) ProcessLog(stop int) Reply {
           returnReply = Reply{}
           returnReply.Err = OK
         } else if currentOp.ConfigNum <= kv.currentConfig.Num {
-          //fmt.Printf("ProcessLog: Ignoring shard because we already have it: %d\n", currentOp.Shard)
           // We already got this database. Thanks, though!
           returnReply = Reply{}
           returnReply.Err = OK
         } else {
           // We have not seen this configuration yet. Try again.
-          //fmt.Printf("ProcessLog: Ignoring shard because we are not ready: %d\n", currentOp.Shard)
           returnReply = Reply{}
           returnReply.Err = ErrWrongGroup
         }
@@ -284,8 +258,6 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
   kv.mu.Lock()
   defer kv.mu.Unlock()
   
-  //fmt.Printf("Processing Get\n")
-  
   var op Op = Op{}
   op.Id = GenUUID()
   op.Type = GetType
@@ -299,8 +271,6 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
   reply.Err = resp.Err
   reply.Value = resp.Value
   
-  //fmt.Printf("Return Value: %v\n", reply.Err)
-  
   kv.px.Done(stop)
   kv.nextPaxosSeq = stop + 1
   
@@ -311,8 +281,6 @@ func (kv *ShardKV) Put(args *PutArgs, reply *PutReply) error {
   
   kv.mu.Lock()
   defer kv.mu.Unlock()
-  
-  //fmt.Printf("Processing Put\n")
   
   var op Op = Op{}
   op.Id = GenUUID()
@@ -335,12 +303,8 @@ func (kv *ShardKV) Put(args *PutArgs, reply *PutReply) error {
 
 func (kv *ShardKV) PutShard(args *PutShardArgs, reply *PutShardReply) error {
 
-  //fmt.Printf("PutShard: Waiting\n")
-
   kv.mu.Lock()
   defer kv.mu.Unlock()
-  
-  //fmt.Printf("PutShard: Start\n")
   
   var op Op = Op{}
   op.Id = GenUUID()
@@ -356,8 +320,6 @@ func (kv *ShardKV) PutShard(args *PutShardArgs, reply *PutShardReply) error {
   
   reply.Err = resp.Err
   
-  //fmt.Printf("PutShard: Response: %v\n", reply.Err)
-  
   kv.px.Done(stop)
   kv.nextPaxosSeq = stop + 1
   
@@ -372,8 +334,6 @@ func (kv *ShardKV) tick() {
   kv.mu.Lock()
   defer kv.mu.Unlock()
   
-  //fmt.Printf("Tick...\n")
-  
   var stop int = -1
   
   var config shardmaster.Config = kv.sm.Query(kv.currentConfig.Num + 1)
@@ -383,8 +343,6 @@ func (kv *ShardKV) tick() {
     op.Id = GenUUID()
     op.Type = ConfigType
     op.Config = config
-    
-    //fmt.Printf("Inserting Operation: %v\n", op)
     
     stop = kv.InsertOperationIntoLog(op)
     kv.ProcessLog(stop)

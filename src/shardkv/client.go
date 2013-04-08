@@ -4,7 +4,6 @@ import "shardmaster"
 import "net/rpc"
 import "time"
 import "sync"
-//import "fmt"
 
 type Clerk struct {
   mu sync.Mutex // one RPC at a time
@@ -80,18 +79,17 @@ func (ck *Clerk) Get(key string) string {
   
   // You'll have to modify Get().
   
+
   for {
     shard := key2shard(key)
-
     gid := ck.config.Shards[shard]
-
     servers, ok := ck.config.Groups[gid]
+
+    ck.requestId++
 
     if ok {
       // try each server in the shard's replication group.
       for _, srv := range servers {
-        ck.requestId++
-        
         args := &GetArgs{}
         args.Key = key
         args.ClientId = ck.clientId
@@ -118,20 +116,16 @@ func (ck *Clerk) Put(key string, value string) {
 
 
   // You'll have to modify Put().
-
   for {
+    ck.requestId++
+
     shard := key2shard(key)
-
     gid := ck.config.Shards[shard]
-
     servers, ok := ck.config.Groups[gid]
-
 
     if ok {
       // try each server in the shard's replication group.
       for _, srv := range servers {
-        ck.requestId++
-        
         args := &PutArgs{}
         args.Key = key
         args.Value = value
@@ -157,13 +151,12 @@ func (ck *Clerk) Put(key string, value string) {
 func (ck *Clerk) PutShard(servers []string, configNum int, shard int, database map[string]string) {
   ck.mu.Lock()
   defer ck.mu.Unlock()
-  
-  for {
 
+  for {
+    ck.requestId++
+    
     // try each server in the shard's replication group.
     for _, srv := range servers {
-      ck.requestId++
-        
       args := &PutShardArgs{}
       args.ConfigNum = configNum
       args.Shard = shard

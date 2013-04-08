@@ -1,0 +1,6 @@
+6.824 Final Project
+
+Group Members: Salman Ahmad (saahmad@mit.edu)
+
+Proposal: I want to explore creating a new programming language with a built-in distributed actor model. The actor model makes it really easy to build concurrent and multicore applications. My goal is to create a distributed, peer-to-peer, language virtual machine that transparently coordinates message passing between actors that could be running on different nodes. I am also interested in exploring fault tolerance schemes within this runtime for these actors. For example, if a machine crashes, the actors that were executing on the machine should automatically be restarted on another available machine. Similarly, when a new machine joins the cluster, actors should be reassigned and load balaced accordingly. My initial idea is to compile the language to JVM bytecode and use an embedded ZooKeeper server for cluster configuration management. 
+

@@ -1,0 +1,4 @@
+
+First of all, it is not important for the client to delete entries because the Gutter will remove entries on its own after a short while. There is no need to explicitly invalidate / manage the entries in the Gutter.
+
+Beyond that, the main reason why it is a bad idea is that the entire point of the Gutter is to insulate the backend services from requests. By deleting entries from the Gutter you remove the benefits that it provides. Other machines that go down will have to be forced to call back to the back end services. So, in short, clients removing from the Gutter is bad because it will decrease the number of requests that can be serviced with cached data.

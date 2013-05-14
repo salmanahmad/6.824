@@ -1,0 +1,2 @@
+
+Both writes are necessary to ensure consistency and durability across machine crashes. Suppose the server only replied to the prepare and did  not write to disk. Now, if the machine crashes before it receives the commit message, when it comes back up, it would have no idea what the old value was and what should have been the outcome of the transaction. By writing to disk on prepare, the server is able to remember what it did last time, compare that to what other did, and properly determine what the end result *should* have been if it had not crashed.

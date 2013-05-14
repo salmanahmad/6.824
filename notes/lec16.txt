@@ -1,0 +1,7 @@
+
+
+1) Transparency: How remote objects look like local. I think this is because the devil is in the details. Plan 9 makes certain decisions for you that do not work in all cases and when it comes to remote interaction, it is not clear that there is a universally accepted "correct" thing to do and have them implemented. A remote file should behave differently than a remote printer. And those differences are best treate at the application level - not the OS.
+
+2) One protocol: Aagain, protocols are often application specific and best handled at the application layer rather than at the OS.
+
+3) Backups: This is something that actually has been somewhat gaining traction in certain consumer level OSes. However, again, in most cases it boils down to the application. In many cases you don't want to back up everything, just your SQL data files. Plan 9 makes that decision for you where it makes the most sense to be implemented by the application.

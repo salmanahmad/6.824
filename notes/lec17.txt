@@ -1,0 +1,6 @@
+
+The reduce worker needs to wait until all of the intermediate data is available. When the first file is available, it can start reading that in, but it cannot process it until all of the rest of the data is available. The reason for this, is that it needs to sort all of the intermediate keys to all occurrences of the same key are grouped together. The reduce function is not called for every {key, value} intermediate result. It is called once for every {key, [values…]} result. That is, the reduce function will get a particular key only once and thus, needs to wait until all the data is available.
+
+
+
+  
